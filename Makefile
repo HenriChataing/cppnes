@@ -12,7 +12,7 @@ LFLAGS := -pg -m32
 LIBS   :=
 
 SRC    := x86/X86Emitter.cc
-SRC    += m6502/M6502State.cc m6502/M6502Eval.cc m6502/M6502Asm.cc
+SRC    += m6502/M6502State.cc m6502/M6502Eval.cc m6502/M6502Asm.cc m6502/M6502Jit.cc
 SRC    += mappers/nrom.cc
 SRC    += Memory.cc Rom.cc Core.cc main.cc
 

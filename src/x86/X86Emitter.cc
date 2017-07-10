@@ -146,12 +146,22 @@ u32 *Emitter::jumpAbs(u8 opl, const u8 *loc)
     return NULL;
 }
 
-void Emitter::dump()
+void Emitter::dump() const
 {
     std::cout << std::hex;
     for (uint i = 0; i < _codeLength; i++) {
         std::cout << " " << std::setfill('0') << std::setw(2);
         std::cout << (uint)_codeBuffer[i];
+    }
+    std::cout << std::endl;
+}
+
+void Emitter::dump(const u8 *start) const
+{
+    std::cout << std::hex << std::setfill('0');
+    u8 *end = _codeBuffer + _codeLength;
+    for (; start < end; start++) {
+        std::cout << " " << std::setw(2) << (uint)start[0];
     }
     std::cout << std::endl;
 }

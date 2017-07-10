@@ -18,6 +18,7 @@ State::State()
     regs.x = 0;
     regs.y = 0;
     regs.p = 0x24;
+    stack = Memory::ram + 0x1fd;
     cycles = 0LL;
     nmi = false;
     irq = false;

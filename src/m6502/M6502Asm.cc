@@ -1,6 +1,7 @@
 
 #include "M6502Asm.h"
 
+namespace M6502 {
 namespace Asm {
 
 const struct metadata instructions[256] =
@@ -263,4 +264,5 @@ const struct metadata instructions[256] =
     {3, 7, ABX, "ISB", unofficial : 1},
 };
 
+};
 };

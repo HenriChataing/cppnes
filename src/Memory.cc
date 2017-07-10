@@ -1,4 +1,6 @@
 
+#include <iostream>
+
 #include "Memory.h"
 #include "Mapper.h"
 
@@ -7,8 +9,10 @@ using namespace Memory;
 namespace Memory {
 
 /**
- * Internal CPU ram, of size 2048.
+ * Internal CPU ram, of size 2048. Force the alignment to be 0x100, this has
+ * consequences on the x86 binary code re-compilation.
  */
+__attribute__((aligned(0x100)))
 u8 ram[0x800];
 
 /**
@@ -34,6 +38,8 @@ u8 prgRam[0x2000];
  */
 u8 load(u16 addr)
 {
+    // std::cerr << std::hex << "LOAD " << (int)addr << std::endl;
+
     if (addr >= 0x8000)
         return prgBank[(addr >> prgBankShift) & prgBankMax][addr & prgBankMask];
     else
@@ -73,6 +79,9 @@ u8 load(u16 addr)
  */
 void store(u16 addr, u8 val)
 {
+    // std::cerr << std::hex << "STORE ";
+    // std::cerr << (int)addr << " " << (int)val << std::endl;
+
     if (addr < 0x2000)
         ram[addr & 0x7ff] = val;
     else

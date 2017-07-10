@@ -4,8 +4,8 @@
 
 #include <string>
 
-namespace Asm
-{
+namespace M6502 {
+namespace Asm {
 
 typedef enum {
     IMM, ZPG, ZPX, ZPY, ABS, ABX, ABY, IND, INX, INY, REL, IMP, ACC
@@ -22,6 +22,7 @@ struct metadata {
 
 extern const struct metadata instructions[256];
 
+};
 };
 
 #define ADC_IMM     0x69

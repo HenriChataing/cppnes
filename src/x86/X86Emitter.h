@@ -69,6 +69,12 @@ class Reg
         Mem operator()(i32 d) {
             return Mem(code, d);
         }
+        bool operator==(const Reg<T> &other) const {
+            return code == other.code;
+        }
+        bool operator!=(const Reg<T> &other) const {
+            return code != other.code;
+        }
 
         u8 code;
 };
@@ -106,8 +112,9 @@ class Emitter
         Emitter(size_t codeSize);
         ~Emitter();
 
-        const u8 *getPtr() { return _codeBuffer + _codeLength; }
-        void dump();
+        const u8 *getPtr() const { return _codeBuffer + _codeLength; }
+        void dump() const;
+        void dump(const u8 *start) const;
 
         u32 *CALL(const u8 *loc = NULL) { return jumpAbs(0xe8, loc); }
         void CALL(const Reg<u32> &r) { put(0xff); put(r.code | 0xd0); }
@@ -169,6 +176,8 @@ class Emitter
         void DEC(const Mem &m) { put(0xff); put(m.mode | 0x08); put(m); }
         void PUSH(const Reg<u32> &r) { put(0x50 | r.code); }
         void PUSH(const Mem &m) { put(0xff); put(m.mode | 0x30); put(m); }
+        void PUSH(u32 v) { put(0x68); put(v); }
+        void PUSH(u8 v) { put(0x6a); put(v); }
         void POP(const Reg<u32> &r) { put(0x58 | r.code); }
         void POP(const Mem &m) { put(0x8f); put(m.mode); put(m); }
 

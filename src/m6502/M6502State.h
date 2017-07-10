@@ -27,6 +27,9 @@ class State
         /** CPU registers. */
         Registers regs;
 
+        /** Stack pointer (equal to Memory::ram + 0x100 + SP) */
+        u8 *stack;
+
         /** Cycle count. */
         ulong cycles;
 
