@@ -401,7 +401,12 @@ static inline bool AXS(X86::Emitter &emit, const X86::Reg<u8> &r) {
  */
 typedef bool (*Operation)(X86::Emitter &emit, const X86::Reg<u8> &r);
 
-static void loadImmediate(X86::Emitter &emit, u16 pc, Operation cont) {
+static void loadImmediate(
+    X86::Emitter &emit,
+    u16 pc,
+    Operation cont,
+    const X86::Reg<u8> &r)
+{
     emit.MOV(Jit::M, Memory::load(pc + 1));
     cont(emit, Jit::M);
 }
@@ -410,7 +415,12 @@ static void loadImmediate(X86::Emitter &emit, u16 pc, Operation cont) {
 //     emit.MOV(Jit::M, Memory::load(pc + 1));
 // }
 
-static void loadZeroPage(X86::Emitter &emit, u16 pc, Operation cont) {
+static void loadZeroPage(
+    X86::Emitter &emit,
+    u16 pc,
+    Operation cont,
+    const X86::Reg<u8> &r)
+{
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
@@ -420,14 +430,23 @@ static void loadZeroPage(X86::Emitter &emit, u16 pc, Operation cont) {
         emit.MOV(X86::eax(), Jit::M);
 }
 
-static void storeZeroPage(X86::Emitter &emit, u16 pc, const X86::Reg<u8> &r) {
+static void storeZeroPage(
+    X86::Emitter &emit,
+    u16 pc,
+    const X86::Reg<u8> &r)
+{
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.MOV(X86::eax(), r);
 }
 
-static void loadZeroPageX(X86::Emitter &emit, u16 pc, Operation cont) {
+static void loadZeroPageX(
+    X86::Emitter &emit,
+    u16 pc,
+    Operation cont,
+    const X86::Reg<u8> &r)
+{
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
@@ -440,7 +459,11 @@ static void loadZeroPageX(X86::Emitter &emit, u16 pc, Operation cont) {
         emit.MOV(X86::eax(), Jit::M);
 }
 
-static void storeZeroPageX(X86::Emitter &emit, u16 pc, const X86::Reg<u8> &r) {
+static void storeZeroPageX(
+    X86::Emitter &emit,
+    u16 pc,
+    const X86::Reg<u8> &r)
+{
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
@@ -450,7 +473,12 @@ static void storeZeroPageX(X86::Emitter &emit, u16 pc, const X86::Reg<u8> &r) {
     emit.MOV(X86::eax(), r);
 }
 
-static void loadZeroPageY(X86::Emitter &emit, u16 pc, Operation cont) {
+static void loadZeroPageY(
+    X86::Emitter &emit,
+    u16 pc,
+    Operation cont,
+    const X86::Reg<u8> &r)
+{
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
@@ -463,7 +491,11 @@ static void loadZeroPageY(X86::Emitter &emit, u16 pc, Operation cont) {
         emit.MOV(X86::eax(), Jit::M);
 }
 
-static void storeZeroPageY(X86::Emitter &emit, u16 pc, const X86::Reg<u8> &r) {
+static void storeZeroPageY(
+    X86::Emitter &emit,
+    u16 pc,
+    const X86::Reg<u8> &r)
+{
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
@@ -473,7 +505,12 @@ static void storeZeroPageY(X86::Emitter &emit, u16 pc, const X86::Reg<u8> &r) {
     emit.MOV(X86::eax(), r);
 }
 
-static void loadAbsolute(X86::Emitter &emit, u16 pc, Operation cont) {
+static void loadAbsolute(
+    X86::Emitter &emit,
+    u16 pc,
+    Operation cont,
+    const X86::Reg<u8> &r)
+{
     u16 addr = Memory::loadw(pc + 1);
     emit.PUSH(X86::edx);
     emit.PUSH((u32)addr);
@@ -495,7 +532,11 @@ static void loadAbsolute(X86::Emitter &emit, u16 pc, Operation cont) {
     }
 }
 
-static void storeAbsolute(X86::Emitter &emit, u16 pc, const X86::Reg<u8> &r) {
+static void storeAbsolute(
+    X86::Emitter &emit,
+    u16 pc,
+    const X86::Reg<u8> &r)
+{
     u16 addr = Memory::loadw(pc + 1);
     if (r != Jit::M)
         emit.MOV(Jit::M, r);
@@ -514,7 +555,12 @@ static void storeAbsolute(X86::Emitter &emit, u16 pc, const X86::Reg<u8> &r) {
  * (without wrapping), and repeated if the addition causes the high u8 to
  * change.
  */
-static void loadAbsoluteX(X86::Emitter &emit, u16 pc, Operation cont) {
+static void loadAbsoluteX(
+    X86::Emitter &emit,
+    u16 pc,
+    Operation cont,
+    const X86::Reg<u8> &r)
+{
     u16 addr = Memory::loadw(pc + 1);
     emit.MOV(X86::eax, (u32)addr);
     /// TODO pushf
@@ -543,7 +589,11 @@ static void loadAbsoluteX(X86::Emitter &emit, u16 pc, Operation cont) {
     // }
 }
 
-static void storeAbsoluteX(X86::Emitter &emit, u16 pc, const X86::Reg<u8> &r) {
+static void storeAbsoluteX(
+    X86::Emitter &emit,
+    u16 pc,
+    const X86::Reg<u8> &r)
+{
     u16 addr = Memory::loadw(pc + 1);
     if (r != Jit::M)
         emit.MOV(Jit::M, r);
@@ -565,7 +615,12 @@ static void storeAbsoluteX(X86::Emitter &emit, u16 pc, const X86::Reg<u8> &r) {
  * (without wrapping), and repeated if the addition causes the high u8 to
  * change.
  */
-static void loadAbsoluteY(X86::Emitter &emit, u16 pc, Operation cont) {
+static void loadAbsoluteY(
+    X86::Emitter &emit,
+    u16 pc,
+    Operation cont,
+    const X86::Reg<u8> &r)
+{
     u16 addr = Memory::loadw(pc + 1);
     emit.MOV(X86::eax, (u32)addr);
     /// TODO pushf
@@ -594,7 +649,11 @@ static void loadAbsoluteY(X86::Emitter &emit, u16 pc, Operation cont) {
     // }
 }
 
-static void storeAbsoluteY(X86::Emitter &emit, u16 pc, const X86::Reg<u8> &r) {
+static void storeAbsoluteY(
+    X86::Emitter &emit,
+    u16 pc,
+    const X86::Reg<u8> &r)
+{
     u16 addr = Memory::loadw(pc + 1);
     if (r != Jit::M)
         emit.MOV(Jit::M, r);
@@ -610,7 +669,12 @@ static void storeAbsoluteY(X86::Emitter &emit, u16 pc, const X86::Reg<u8> &r) {
     emit.POP(X86::edx);
 }
 
-static void loadIndexedIndirect(X86::Emitter &emit, u16 pc, Operation cont) {
+static void loadIndexedIndirect(
+    X86::Emitter &emit,
+    u16 pc,
+    Operation cont,
+    const X86::Reg<u8> &r)
+{
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
@@ -637,7 +701,11 @@ static void loadIndexedIndirect(X86::Emitter &emit, u16 pc, Operation cont) {
     }
 }
 
-static void storeIndexedIndirect(X86::Emitter &emit, u16 pc, const X86::Reg<u8> &r) {
+static void storeIndexedIndirect(
+    X86::Emitter &emit,
+    u16 pc,
+    const X86::Reg<u8> &r)
+{
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     if (r != Jit::M)
@@ -662,7 +730,12 @@ static void storeIndexedIndirect(X86::Emitter &emit, u16 pc, const X86::Reg<u8> 
  * (without wrapping), and repeated if the addition causes the high u8 to
  * change.
  */
-static void loadIndirectIndexed(X86::Emitter &emit, u16 pc, Operation cont) {
+static void loadIndirectIndexed(
+    X86::Emitter &emit,
+    u16 pc,
+    Operation cont,
+    const X86::Reg<u8> &r)
+{
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
@@ -704,7 +777,11 @@ static void loadIndirectIndexed(X86::Emitter &emit, u16 pc, Operation cont) {
  * A first fecth is performed at the partially computed address addr + x
  * (without wrapping).
  */
-static void storeIndirectIndexed(X86::Emitter &emit, u16 pc, const X86::Reg<u8> &r) {
+static void storeIndirectIndexed(
+    X86::Emitter &emit,
+    u16 pc,
+    const X86::Reg<u8> &r)
+{
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     if (r != Jit::M)
@@ -752,17 +829,25 @@ static u16 getIndirect(void) {
 }
 #endif
 
-/** Generate the code for an instruction fetching a value from memory. */
-#define CASE_LD_MEM(op, fun, load)                                             \
+#define CASE_LD_MEM(op, load, ...)                                             \
+    CASE_LD_MEM_GEN(op, load, __VA_ARGS__, Jit::M)
+
+/**
+ * Generate the code for an instruction fetching a value from memory.
+ */
+#define CASE_LD_MEM_GEN(op, load, fun, r, ...)                                 \
     case op: {                                                                 \
-        load(emit, pc, fun);                                                   \
+        load(emit, pc, fun, r);                                                \
         break;                                                                 \
     }
 
-/** Generate the code for an instruction writing a value to memory. */
-#define CASE_ST_MEM(op, reg, store)                                            \
+/**
+ * Generate the code for an instruction writing a value to memory.
+ * The source register is always specified.
+ */
+#define CASE_ST_MEM(op, r, store)                                              \
     case op: {                                                                 \
-        store(emit, pc, reg);                                                  \
+        store(emit, pc, r);                                                    \
         break;                                                                 \
     }
 
@@ -798,22 +883,22 @@ static u16 getIndirect(void) {
 #define CASE_NN(op, fun) CASE_NN_EXP(op##_IMP, fun(emit))
 #define CASE_NN_UO(op, fun) CASE_NN_EXP(op, fun(emit))
 
-#define CASE_LD_IMM(op, fun)  CASE_LD_MEM(op##_IMM, fun, loadImmediate)
-#define CASE_LD_ZPG(op, fun)  CASE_LD_MEM(op##_ZPG, fun, loadZeroPage)
-#define CASE_LD_ZPX(op, fun)  CASE_LD_MEM(op##_ZPX, fun, loadZeroPageX)
-#define CASE_LD_ZPY(op, fun)  CASE_LD_MEM(op##_ZPY, fun, loadZeroPageY)
-#define CASE_LD_ABS(op, fun)  CASE_LD_MEM(op##_ABS, fun, loadAbsolute)
-#define CASE_LD_ABX(op, fun)  CASE_LD_MEM(op##_ABX, fun, loadAbsoluteX)
-#define CASE_LD_ABY(op, fun)  CASE_LD_MEM(op##_ABY, fun, loadAbsoluteY)
-#define CASE_LD_IND(op, fun)  CASE_LD_MEM(op##_IND, fun, loadIndirect)
-#define CASE_LD_INX(op, fun)  CASE_LD_MEM(op##_INX, fun, loadIndexedIndirect)
-#define CASE_LD_INY(op, fun)  CASE_LD_MEM(op##_INY, fun, loadIndirectIndexed)
+#define CASE_LD_IMM(op, ...)  CASE_LD_MEM(op##_IMM, loadImmediate, __VA_ARGS__)
+#define CASE_LD_ZPG(op, ...)  CASE_LD_MEM(op##_ZPG, loadZeroPage, __VA_ARGS__)
+#define CASE_LD_ZPX(op, ...)  CASE_LD_MEM(op##_ZPX, loadZeroPageX, __VA_ARGS__)
+#define CASE_LD_ZPY(op, ...)  CASE_LD_MEM(op##_ZPY, loadZeroPageY, __VA_ARGS__)
+#define CASE_LD_ABS(op, ...)  CASE_LD_MEM(op##_ABS, loadAbsolute, __VA_ARGS__)
+#define CASE_LD_ABX(op, ...)  CASE_LD_MEM(op##_ABX, loadAbsoluteX, __VA_ARGS__)
+#define CASE_LD_ABY(op, ...)  CASE_LD_MEM(op##_ABY, loadAbsoluteY, __VA_ARGS__)
+#define CASE_LD_IND(op, ...)  CASE_LD_MEM(op##_IND, loadIndirect, __VA_ARGS__)
+#define CASE_LD_INX(op, ...)  CASE_LD_MEM(op##_INX, loadIndexedIndirect, __VA_ARGS__)
+#define CASE_LD_INY(op, ...)  CASE_LD_MEM(op##_INY, loadIndirectIndexed, __VA_ARGS__)
 
-#define CASE_LD_IMM_UO(op, fun)  CASE_LD_MEM(op, fun, loadImmediate)
-#define CASE_LD_ZPG_UO(op, fun)  CASE_LD_MEM(op, fun, loadZeroPage)
-#define CASE_LD_ZPX_UO(op, fun)  CASE_LD_MEM(op, fun, loadZeroPageX)
-#define CASE_LD_ABS_UO(op, fun)  CASE_LD_MEM(op, fun, loadAbsolute)
-#define CASE_LD_ABX_UO(op, fun)  CASE_LD_MEM(op, fun, loadAbsoluteX)
+#define CASE_LD_IMM_UO(op, ...)  CASE_LD_MEM(op, loadImmediate, __VA_ARGS__)
+#define CASE_LD_ZPG_UO(op, ...)  CASE_LD_MEM(op, loadZeroPage, __VA_ARGS__)
+#define CASE_LD_ZPX_UO(op, ...)  CASE_LD_MEM(op, loadZeroPageX, __VA_ARGS__)
+#define CASE_LD_ABS_UO(op, ...)  CASE_LD_MEM(op, loadAbsolute, __VA_ARGS__)
+#define CASE_LD_ABX_UO(op, ...)  CASE_LD_MEM(op, loadAbsoluteX, __VA_ARGS__)
 
 #define CASE_ST_ZPG(op, reg)  CASE_ST_MEM(op##_ZPG, reg, storeZeroPage)
 #define CASE_ST_ZPX(op, reg)  CASE_ST_MEM(op##_ZPX, reg, storeZeroPageX)
@@ -825,13 +910,13 @@ static u16 getIndirect(void) {
 #define CASE_ST_INY(op, reg)  CASE_ST_MEM(op##_INY, reg, storeIndirectIndexed)
 
 #define CASE_UP_ACC(op, fun)  CASE_UP_REG(op##_ACC, fun, Jit::A)
-#define CASE_UP_ZPG(op, fun)  CASE_LD_MEM(op##_ZPG, fun, loadZeroPage)
-#define CASE_UP_ZPX(op, fun)  CASE_LD_MEM(op##_ZPX, fun, loadZeroPageX)
-#define CASE_UP_ABS(op, fun)  CASE_LD_MEM(op##_ABS, fun, loadAbsolute)
-#define CASE_UP_ABX(op, fun)  CASE_LD_MEM(op##_ABX, fun, loadAbsoluteX)
-#define CASE_UP_ABY(op, fun)  CASE_LD_MEM(op##_ABY, fun, loadAbsoluteY)
-#define CASE_UP_INX(op, fun)  CASE_LD_MEM(op##_INX, fun, loadIndexedIndirect)
-#define CASE_UP_INY(op, fun)  CASE_LD_MEM(op##_INY, fun, loadIndirectIndexed)
+#define CASE_UP_ZPG(op, fun)  CASE_LD_MEM(op##_ZPG, loadZeroPage, fun)
+#define CASE_UP_ZPX(op, fun)  CASE_LD_MEM(op##_ZPX, loadZeroPageX, fun)
+#define CASE_UP_ABS(op, fun)  CASE_LD_MEM(op##_ABS, loadAbsolute, fun)
+#define CASE_UP_ABX(op, fun)  CASE_LD_MEM(op##_ABX, loadAbsoluteX, fun)
+#define CASE_UP_ABY(op, fun)  CASE_LD_MEM(op##_ABY, loadAbsoluteY, fun)
+#define CASE_UP_INX(op, fun)  CASE_LD_MEM(op##_INX, loadIndexedIndirect, fun)
+#define CASE_UP_INY(op, fun)  CASE_LD_MEM(op##_INY, loadIndirectIndexed, fun)
 
 Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
     : address(pc), opcode(opcode), next(NULL), jump(NULL)
@@ -942,26 +1027,26 @@ Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
         CASE_NN(INX, INX);
         CASE_NN(INY, INY);
 
-        CASE_LD_IMM(LDA, LDA);
-        CASE_LD_ZPG(LDA, LDA);
-        CASE_LD_ZPX(LDA, LDA);
-        CASE_LD_ABS(LDA, LDA);
-        CASE_LD_ABX(LDA, LDA);
-        CASE_LD_ABY(LDA, LDA);
-        CASE_LD_INX(LDA, LDA);
-        CASE_LD_INY(LDA, LDA);
+        CASE_LD_IMM(LDA, LDA, Jit::A);
+        CASE_LD_ZPG(LDA, LDA, Jit::A);
+        CASE_LD_ZPX(LDA, LDA, Jit::A);
+        CASE_LD_ABS(LDA, LDA, Jit::A);
+        CASE_LD_ABX(LDA, LDA, Jit::A);
+        CASE_LD_ABY(LDA, LDA, Jit::A);
+        CASE_LD_INX(LDA, LDA, Jit::A);
+        CASE_LD_INY(LDA, LDA, Jit::A);
 
-        CASE_LD_IMM(LDX, LDX);
-        CASE_LD_ZPG(LDX, LDX);
-        CASE_LD_ZPY(LDX, LDX);
-        CASE_LD_ABS(LDX, LDX);
-        CASE_LD_ABY(LDX, LDX);
+        CASE_LD_IMM(LDX, LDX, Jit::X);
+        CASE_LD_ZPG(LDX, LDX, Jit::X);
+        CASE_LD_ZPY(LDX, LDX, Jit::X);
+        CASE_LD_ABS(LDX, LDX, Jit::X);
+        CASE_LD_ABY(LDX, LDX, Jit::X);
 
-        CASE_LD_IMM(LDY, LDY);
-        CASE_LD_ZPG(LDY, LDY);
-        CASE_LD_ZPX(LDY, LDY);
-        CASE_LD_ABS(LDY, LDY);
-        CASE_LD_ABX(LDY, LDY);
+        CASE_LD_IMM(LDY, LDY, Jit::Y);
+        CASE_LD_ZPG(LDY, LDY, Jit::Y);
+        CASE_LD_ZPX(LDY, LDY, Jit::Y);
+        CASE_LD_ABS(LDY, LDY, Jit::Y);
+        CASE_LD_ABX(LDY, LDY, Jit::Y);
 
         CASE_UP_ACC(LSR, LSR);
         CASE_UP_ZPG(LSR, LSR);
@@ -1197,6 +1282,16 @@ void Instruction::run()
     Registers *regs = &currentState->regs;
     u16 pc = 0;
 
+    std::cerr << std::hex << std::uppercase << std::setfill('0');
+    std::cerr << std::setw(4) << (int)address << "  ??        ???         ";
+    std::cerr << " A:" << std::setw(2) << (int)regs->a;
+    std::cerr << " X:" << std::setw(2) << (int)regs->x;
+    std::cerr << " Y:" << std::setw(2) << (int)regs->y;
+    std::cerr << " P:" << std::setw(2) << (int)regs->p;
+    std::cerr << " SP:" << std::setw(2) << (int)regs->sp;
+    std::cerr << " CYC:" << std::dec << currentState->cycles;
+    std::cerr << std::nouppercase << std::endl;
+
     currentState->stack = Memory::ram + 0x100 + regs->sp;
     asm (
         "movl %1, %%ecx\n"
@@ -1215,14 +1310,4 @@ void Instruction::run()
         : "%ecx", "%edx", "%ebx");
     regs->sp = currentState->stack - Memory::ram - 0x100;
     regs->pc = pc;
-
-    std::cerr << std::hex << std::uppercase << std::setfill('0');
-    std::cerr << std::setw(4) << (int)pc << "  ??        ???         ";
-    std::cerr << " A:" << std::setw(2) << (int)regs->a;
-    std::cerr << " X:" << std::setw(2) << (int)regs->x;
-    std::cerr << " Y:" << std::setw(2) << (int)regs->y;
-    std::cerr << " P:" << std::setw(2) << (int)regs->p;
-    std::cerr << " SP:" << std::setw(2) << (int)regs->sp;
-    std::cerr << " CYC:" << std::dec << currentState->cycles;
-    std::cerr << std::nouppercase << std::endl;
 }
