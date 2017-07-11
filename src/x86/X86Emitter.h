@@ -130,6 +130,13 @@ class Emitter
         void RETN() { put(0xc3); }
         void RETF() { put(0xcb); }
 
+        void PUSHF() { put(0x9c); }
+        void POPF() { put(0x9d); }
+        void SAHF() { put(0x9e); }
+        void LAHF() { put(0x9f); }
+        void CLC() { put(0xf8); }
+        void STC() { put(0xf9); }
+
         u32 *JO(const u8 *loc = NULL) { return jumpCond(0x70, 0x80, loc); }
         u32 *JNO(const u8 *loc = NULL) { return jumpCond(0x71, 0x81, loc); }
         u32 *JB(const u8 *loc = NULL) { return jumpCond(0x72, 0x82, loc); }
@@ -180,6 +187,9 @@ class Emitter
         void PUSH(u8 v) { put(0x6a); put(v); }
         void POP(const Reg<u32> &r) { put(0x58 | r.code); }
         void POP(const Mem &m) { put(0x8f); put(m.mode); put(m); }
+
+        void TEST(const Reg<u8> &r0, const Reg<u8> &r1) { binop(0x84, r0, r1); }
+        void TEST(const Reg<u32> &r0, const Reg<u32> &r1) { binop(0x84, r0, r1); }
 
         void MOV(const Reg<u8> &r0, const Reg<u8> &r1) { binop(0x88, r0, r1); }
         void MOV(const Reg<u32> &r0, const Reg<u32> &r1) { binop(0x88, r0, r1); }
