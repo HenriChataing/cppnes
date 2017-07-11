@@ -290,6 +290,9 @@ class Emitter
         void CMP(const Reg<u32> &r, u32 v) { binop(0x3d, 0x80, 0x7, r, v); }
         void CMP(const Mem &m, u32 v) { binop(0x80, 0x7, m, v); }
 
+        void SHL(const Reg<u8> &r, u8 s) { put(0xc0); put(0xe0 | r.code); put(s); }
+        void SHL(const Reg<u32> &r, u8 s) { put(0xc1); put(0xe0 | r.code); put(s); }
+
     private:
         u8 *_codeBuffer;
         size_t _codeLength;

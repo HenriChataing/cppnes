@@ -234,7 +234,20 @@ static inline bool NOP(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool BIT(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    throw "BIT unimplemented";
+    emit.PUSHF();
+    emit.POP(X86::ecx);
+    emit.AND(X86::ecx, 0xfffff77f); // Clear Overflow and Sign flags.
+    emit.MOV(X86::al, r);
+    emit.AND(X86::al, Jit::A);
+    emit.AND(X86::al, 0x80);
+    emit.OR(X86::cl, X86::al);
+    emit.MOV(X86::al, r);
+    emit.AND(X86::al, Jit::A);
+    emit.SHL(X86::eax, 5);
+    emit.AND(X86::ah, 0x8);
+    emit.OR(X86::ch, X86::ah);
+    emit.PUSH(X86::ecx);
+    emit.POPF();
     return false;
 }
 
