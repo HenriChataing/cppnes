@@ -256,11 +256,19 @@ static inline void CLC(X86::Emitter &emit) {
 }
 
 static inline void CLD(X86::Emitter &emit) {
-    throw "CLD unimplemented";
+    u8 *p = &currentState->regs.p;
+    emit.MOV(X86::eax, (u32)p);
+    emit.PUSHF();
+    emit.AND(X86::eax(), (u8)0xf7);
+    emit.POPF();
 }
 
 static inline void CLI(X86::Emitter &emit) {
-    throw "CLI unimplemented";
+    u8 *p = &currentState->regs.p;
+    emit.MOV(X86::eax, (u32)p);
+    emit.PUSHF();
+    emit.AND(X86::eax(), (u8)0xfb);
+    emit.POPF();
 }
 
 static inline void CLV(X86::Emitter &emit) {
@@ -319,11 +327,19 @@ static inline void SEC(X86::Emitter &emit) {
 }
 
 static inline void SED(X86::Emitter &emit) {
-    throw "SED unimplemented";
+    u8 *p = &currentState->regs.p;
+    emit.MOV(X86::eax, (u32)p);
+    emit.PUSHF();
+    emit.OR(X86::eax(), (u8)0x8);
+    emit.POPF();
 }
 
 static inline void SEI(X86::Emitter &emit) {
-    throw "SEI unimplemented";
+    u8 *p = &currentState->regs.p;
+    emit.MOV(X86::eax, (u32)p);
+    emit.PUSHF();
+    emit.OR(X86::eax(), (u8)0x4);
+    emit.POPF();
 }
 
 static inline void TAX(X86::Emitter &emit) {
