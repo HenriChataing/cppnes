@@ -1,5 +1,6 @@
 
 #include <iostream>
+#include <cstddef>
 
 #include "Memory.h"
 #include "M6502State.h"

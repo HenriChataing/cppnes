@@ -44,7 +44,7 @@ Instruction *InstructionCache::cacheBlock(u16 address)
 
     Instruction *prev = NULL, *instr;
     u16 pc = address;
-    const u8 *start = _asmEmitter.getPtr();
+    // const u8 *start = _asmEmitter.getPtr();
 
     while (true)
     {
@@ -234,46 +234,52 @@ static inline bool NOP(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool BIT(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    /// using TEST
     throw "BIT unimplemented";
     return false;
 }
 
 static inline void CLC(X86::Emitter &emit) {
-    // P &= ~P_C;
+    emit.CLC();
 }
 
 static inline void CLD(X86::Emitter &emit) {
-    // P &= ~P_D;
+    throw "CLD unimplemented";
 }
 
 static inline void CLI(X86::Emitter &emit) {
-    // P &= ~P_I;
+    throw "CLI unimplemented";
 }
 
 static inline void CLV(X86::Emitter &emit) {
-    // P &= ~P_V;
+    throw "CLV unimplemented";
 }
 
 /** Unofficial instruction. */
 static inline bool LAX(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.MOV(Jit::A, r);
     emit.MOV(Jit::X, r);
+    emit.TEST(r, r);
     return false;
 }
 
 static inline bool LDA(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    emit.MOV(Jit::A, r);
+    if (r != Jit::A)
+        emit.MOV(Jit::A, r);
+    emit.TEST(Jit::A, Jit::A);
     return false;
 }
 
 static inline bool LDX(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    emit.MOV(Jit::X, r);
+    if (r != Jit::X)
+        emit.MOV(Jit::X, r);
+    emit.TEST(Jit::X, Jit::X);
     return false;
 }
 
 static inline bool LDY(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    emit.MOV(Jit::Y, r);
+    if (r != Jit::Y)
+        emit.MOV(Jit::Y, r);
+    emit.TEST(Jit::Y, Jit::Y);
     return false;
 }
 
@@ -296,15 +302,15 @@ static inline void PLP(X86::Emitter &emit) {
 }
 
 static inline void SEC(X86::Emitter &emit) {
-    // P |= P_C;
+    emit.STC();
 }
 
 static inline void SED(X86::Emitter &emit) {
-    // P |= P_D;
+    throw "SED unimplemented";
 }
 
 static inline void SEI(X86::Emitter &emit) {
-    // P |= P_I;
+    throw "SEI unimplemented";
 }
 
 static inline void TAX(X86::Emitter &emit) {
@@ -450,9 +456,9 @@ static void loadZeroPageX(
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
-    /// TODO pushf
+    emit.PUSHF();
     emit.ADD(X86::al, Jit::X);
-    /// TODO popf
+    emit.POPF();
     emit.MOV(Jit::M, X86::eax());
     bool wb = cont(emit, Jit::M);
     if (wb)
@@ -467,9 +473,9 @@ static void storeZeroPageX(
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
-    /// TODO pushf
+    emit.PUSHF();
     emit.ADD(X86::al, Jit::X);
-    /// TODO popf
+    emit.POPF();
     emit.MOV(X86::eax(), r);
 }
 
@@ -482,9 +488,9 @@ static void loadZeroPageY(
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
-    /// TODO pushf
+    emit.PUSHF();
     emit.ADD(X86::al, Jit::Y);
-    /// TODO popf
+    emit.POPF();
     emit.MOV(Jit::M, X86::eax());
     bool wb = cont(emit, Jit::M);
     if (wb)
@@ -499,9 +505,9 @@ static void storeZeroPageY(
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
-    /// TODO pushf
+    emit.PUSHF();
     emit.ADD(X86::al, Jit::Y);
-    /// TODO popf
+    emit.POPF();
     emit.MOV(X86::eax(), r);
 }
 
@@ -512,23 +518,23 @@ static void loadAbsolute(
     const X86::Reg<u8> &r)
 {
     u16 addr = Memory::loadw(pc + 1);
+    emit.PUSHF();
     emit.PUSH(X86::edx);
     emit.PUSH((u32)addr);
-    /// TODO pushf
     emit.CALL((u8 *)Memory::load);
-    /// TODO popf
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
+    emit.POPF();
     emit.MOV(Jit::M, X86::al);
     bool wb = cont(emit, Jit::M);
     if (wb) {
+        emit.PUSHF();
         emit.PUSH(X86::edx);
         emit.PUSH((u32)addr);
-        /// TODO pushf
         emit.CALL((u8 *)Memory::store);
-        /// TODO popf
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
+        emit.POPF();
     }
 }
 
@@ -540,13 +546,13 @@ static void storeAbsolute(
     u16 addr = Memory::loadw(pc + 1);
     if (r != Jit::M)
         emit.MOV(Jit::M, r);
+    emit.PUSHF();
     emit.PUSH(X86::edx);
     emit.PUSH((u32)addr);
-    /// TODO pushf
     emit.CALL((u8 *)Memory::store);
-    /// TODO popf
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
+    emit.POPF();
 }
 
 /**
@@ -563,23 +569,25 @@ static void loadAbsoluteX(
 {
     u16 addr = Memory::loadw(pc + 1);
     emit.MOV(X86::eax, (u32)addr);
-    /// TODO pushf
+    emit.PUSHF();
     emit.ADD(X86::al, Jit::X);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::load);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
+    emit.POPF();
     emit.MOV(Jit::M, X86::al);
     /// TODO check carry bit, if 1 add cycle and repeat load
-    /// TODO popf
     bool wb = cont(emit, Jit::M);
     if (wb) {
+        emit.PUSHF();
         emit.PUSH(X86::edx);
         emit.PUSH(X86::ecx);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
+        emit.POPF();
     }
 
     // u16 addrX = addr + X;
@@ -600,13 +608,14 @@ static void storeAbsoluteX(
     emit.MOV(X86::eax, (u32)addr);
     emit.MOV(X86::ecx, 0);
     emit.MOV(X86::cl, Jit::X);
-    /// TODO pushf
+    emit.PUSHF();
     emit.ADD(X86::eax, X86::ecx);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::store);
     emit.POP(X86::eax);
     emit.POP(X86::edx);
+    emit.POPF();
 }
 
 /**
@@ -623,23 +632,25 @@ static void loadAbsoluteY(
 {
     u16 addr = Memory::loadw(pc + 1);
     emit.MOV(X86::eax, (u32)addr);
-    /// TODO pushf
+    emit.PUSHF();
     emit.ADD(X86::al, Jit::Y);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::load);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
+    emit.POPF();
     emit.MOV(Jit::M, X86::al);
     /// TODO check carry bit, if 1 add cycle and repeat load
-    /// TODO popf
     bool wb = cont(emit, Jit::M);
     if (wb) {
+        emit.PUSHF();
         emit.PUSH(X86::edx);
         emit.PUSH(X86::ecx);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
+        emit.POPF();
     }
 
     // u16 addrY = addr + Y;
@@ -660,13 +671,14 @@ static void storeAbsoluteY(
     emit.MOV(X86::eax, (u32)addr);
     emit.MOV(X86::ecx, 0);
     emit.MOV(X86::cl, Jit::Y);
-    /// TODO pushf
+    emit.PUSHF();
     emit.ADD(X86::eax, X86::ecx);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::store);
     emit.POP(X86::eax);
     emit.POP(X86::edx);
+    emit.POPF();
 }
 
 static void loadIndexedIndirect(
@@ -679,7 +691,7 @@ static void loadIndexedIndirect(
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.MOV(X86::ecx, 0);
-    /// TODO pushf
+    emit.PUSHF();
     emit.ADD(X86::al, Jit::X);
     emit.MOV(X86::cl, X86::eax());
     emit.INC(X86::al);
@@ -689,15 +701,18 @@ static void loadIndexedIndirect(
     emit.CALL((u8 *)Memory::load);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
+    emit.POPF();
     emit.MOV(Jit::M, X86::al);
     /// TODO popf
     bool wb = cont(emit, Jit::M);
     if (wb) {
+        emit.PUSHF();
         emit.PUSH(X86::edx);
         emit.PUSH(X86::ecx);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
+        emit.POPF();
     }
 }
 
@@ -712,7 +727,7 @@ static void storeIndexedIndirect(
         emit.MOV(Jit::M, r);
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.MOV(X86::ecx, 0);
-    /// TODO pushf
+    emit.PUSHF();
     emit.ADD(X86::al, Jit::X);
     emit.MOV(X86::cl, X86::eax());
     emit.INC(X86::al);
@@ -722,6 +737,7 @@ static void storeIndexedIndirect(
     emit.CALL((u8 *)Memory::store);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
+    emit.POPF();
 }
 
 /**
@@ -740,7 +756,7 @@ static void loadIndirectIndexed(
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.MOV(X86::ecx, 0);
-    /// TODO pushf
+    emit.PUSHF();
     emit.MOV(X86::cl, X86::eax());
     emit.INC(X86::al);
     emit.MOV(X86::ch, X86::eax());
@@ -751,15 +767,17 @@ static void loadIndirectIndexed(
     emit.CALL((u8 *)Memory::load);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
+    emit.POPF();
     emit.MOV(Jit::M, X86::al);
-    /// TODO popf
     bool wb = cont(emit, Jit::M);
     if (wb) {
+        emit.PUSHF();
         emit.PUSH(X86::edx);
         emit.PUSH(X86::ecx);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
+        emit.POPF();
     }
 
     // u16 addr = Memory::load(PC + 1), addrY;
@@ -788,7 +806,7 @@ static void storeIndirectIndexed(
         emit.MOV(Jit::M, r);
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.MOV(X86::ecx, 0);
-    /// TODO pushf
+    emit.PUSHF();
     emit.MOV(X86::cl, X86::eax());
     emit.INC(X86::al);
     emit.MOV(X86::ch, X86::eax());
@@ -799,7 +817,7 @@ static void storeIndirectIndexed(
     emit.CALL((u8 *)Memory::store);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
-    /// TODO popf
+    emit.POPF();
 
     // u16 addr = Memory::load(PC + 1), addrY;
     // addr = Memory::loadzw(addr);
@@ -950,6 +968,8 @@ Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
         case RTS_IMP:
             branch = true;
             emit.MOV(X86::eax, pc);
+            emit.PUSHF();
+            emit.POP(X86::ecx);
             emit.RETN();
             break;
 
@@ -1280,7 +1300,6 @@ void Instruction::setNext(Instruction *instr)
 void Instruction::run()
 {
     Registers *regs = &currentState->regs;
-    u16 pc = 0;
 
     std::cerr << std::hex << std::uppercase << std::setfill('0');
     std::cerr << std::setw(4) << (int)address << "  ??        ???         ";
@@ -1294,20 +1313,49 @@ void Instruction::run()
 
     currentState->stack = Memory::ram + 0x100 + regs->sp;
     asm (
-        "movl %1, %%ecx\n"
+        /* Save pointer to regs (scratched by compiled code) */
         "push %%ecx\n"
+        /* Load status flags */
+        "pushf\n"               // Load x86 status flags into %edx
+        "pop %%edx\n"
+        "and $0xf73e, %%dx\n"   // Clear Carry, Zero, Sign, Overflow bits
+        "mov 3(%%ecx), %%bl\n"  // Load 6502 status flags into %bl
+        "and $0x81, %%bl\n"     // Keep bits Carry and Sign
+        "or %%bl, %%dl\n"       // Write them to %edx
+        "mov $0, %%bx\n"
+        "mov 3(%%ecx), %%bl\n"  // Get 6502 status flags
+        "and $0x42, %%bx\n"     // Keep bits Zero and Overflow
+        "shl $5, %%bx\n"        // Left shift by 5 to place them correctly
+        "or %%bx, %%dx\n"       // Write them to %edx
+        "push %%edx\n"          // Override the original flags with
+        "popf\n"                // the constructed value
+        /* Load A,X,Y registers */
         "mov (%%ecx), %%dh\n"
         "mov 1(%%ecx), %%bl\n"
         "mov 2(%%ecx), %%bh\n"
-        "call *%2\n"
+        /* Jump to native code */
+        "call *%1\n"
+        /* Store A,X,Y registers */
         "pop %%ecx\n"
         "mov %%dh, (%%ecx)\n"
         "mov %%bl, 1(%%ecx)\n"
         "mov %%bh, 2(%%ecx)\n"
-        "mov %%ax, %0\n"
-        : "=r" (pc)
-        : "r" (regs), "r" (nativeCode)
-        : "%ecx", "%edx", "%ebx");
+        "mov %%ax, 6(%%ecx)\n"
+        /* Store status flags */
+        "pushf\n"               // Load x86 status flags into %edx
+        "pop %%edx\n"
+        "push %%edx\n"          // Keep a copy of the original x86 flags
+        "mov 3(%%ecx), %%bl\n"  // Get 6502 status flags
+        "and $0x3c, %%bl\n"     // Clear Carry, Zero, Sign, Overflow bits
+        "and $0x81, %%dl\n"
+        "or %%dl, %%bl\n"
+        "pop %%edx\n"
+        "shr $5, %%dx\n"
+        "and $0x42, %%dl\n"
+        "or %%dl, %%bl\n"
+        "mov %%bl, 3(%%ecx)\n"
+        :
+        : "c" (regs), "r" (nativeCode)
+        : "%edx", "%ebx");
     regs->sp = currentState->stack - Memory::ram - 0x100;
-    regs->pc = pc;
 }

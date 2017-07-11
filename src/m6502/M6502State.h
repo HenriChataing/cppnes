@@ -12,8 +12,8 @@ struct Registers
     u8 x;
     u8 y;
     u8 p;
-    u16 pc;
     u8 sp;
+    u16 pc;
 };
 
 class State
