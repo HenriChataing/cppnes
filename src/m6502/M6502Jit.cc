@@ -93,10 +93,10 @@ const X86::Reg<u8> Y = X86::bh;
 };
 
 /**
- * Generate byte code to restore selected status flags from the a saved
+ * Generate bytecode to restore selected status flags from the a saved
  * state pushed onto the stack (i.e. PUSHF)
  */
-static inline void restoreStatusFlags(X86::Emitter &emit, u32 mask)
+static void restoreStatusFlags(X86::Emitter &emit, u32 mask)
 {
     /// FIXME
     // Cannot use
@@ -116,11 +116,41 @@ static inline void restoreStatusFlags(X86::Emitter &emit, u32 mask)
  * Generate bytecode to set the Zero and Sign bits depending on the value
  * in the given register \p r.
  */
-static inline void testZeroSign(X86::Emitter &emit, const X86::Reg<u8> &r)
+static void testZeroSign(X86::Emitter &emit, const X86::Reg<u8> &r)
 {
     emit.PUSHF();
     emit.TEST(r, r);
     restoreStatusFlags(emit, 0x801);
+}
+
+/**
+ * Generate the bytecode for a comparison between two byte size registers.
+ * The status flags cannot be directly used as there are some variations
+ * on the expected values.
+ */
+static void compare(
+    X86::Emitter &emit,
+    const X86::Reg<u8> &r0,
+    const X86::Reg<u8> &r1)
+{
+    emit.PUSHF();
+    emit.CMP(r0, r1);
+    emit.POP(X86::eax);
+    emit.PUSHF();
+    emit.POP(X86::ecx);
+    /* Discard the overflow flag. */
+    emit.AND(X86::eax, 0x800);
+    emit.OR(X86::ecx, X86::eax);
+    /*
+     * It is necessary to OR the carry flag with the zero flag, as the
+     * signification is slightly different for 6502 (set if greater OR equal)
+     */
+    emit.MOV(X86::al, X86::cl);
+    emit.SHR(X86::al, 6);
+    emit.AND(X86::al, 1);
+    emit.OR(X86::cl, X86::al);
+    emit.PUSH(X86::ecx);
+    emit.POPF();
 }
 
 static inline bool ADC(X86::Emitter &emit, const X86::Reg<u8> &r) {
@@ -141,17 +171,17 @@ static inline bool ASL(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool CMP(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    emit.CMP(Jit::A, r);
+    compare(emit, Jit::A, r);
     return false;
 }
 
 static inline bool CPX(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    emit.CMP(Jit::X, r);
+    compare(emit, Jit::X, r);
     return false;
 }
 
 static inline bool CPY(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    emit.CMP(Jit::Y, r);
+    compare(emit, Jit::Y, r);
     return false;
 }
 
@@ -1030,13 +1060,13 @@ Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
 {
     nativeCode = emit.getPtr();
 
-    if (pc == 0xC7EB) {
-        branch = true;
-        emit.MOV(X86::eax, pc);
-        emit.PUSHF();
-        emit.POP(X86::ecx);
-        emit.RETN();
-    }
+    // if (pc == 0xC7EB) {
+    //     branch = true;
+    //     emit.MOV(X86::eax, pc);
+    //     emit.PUSHF();
+    //     emit.POP(X86::ecx);
+    //     emit.RETN();
+    // }
 
     /* Check jamming instructions. */
     if (Asm::instructions[opcode].jam) {
