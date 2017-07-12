@@ -292,6 +292,10 @@ class Emitter
 
         void SHL(const Reg<u8> &r, u8 s) { put(0xc0); put(0xe0 | r.code); put(s); }
         void SHL(const Reg<u32> &r, u8 s) { put(0xc1); put(0xe0 | r.code); put(s); }
+        void SHL(const Mem &m, u8 s) { put(0xc1); put(0x20 | m.mode); put(m); put(s); }
+        void SHR(const Reg<u8> &r, u8 s) { put(0xc0); put(0xe8 | r.code); put(s); }
+        void SHR(const Reg<u32> &r, u8 s) { put(0xc1); put(0xe8 | r.code); put(s); }
+        void SHR(const Mem &m, u8 s) { put(0xc1); put(0x28 | m.mode); put(m); put(s); }
 
     private:
         u8 *_codeBuffer;

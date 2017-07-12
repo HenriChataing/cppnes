@@ -92,13 +92,46 @@ const X86::Reg<u8> Y = X86::bh;
 
 };
 
+/**
+ * Generate byte code to restore selected status flags from the a saved
+ * state pushed onto the stack (i.e. PUSHF)
+ */
+static inline void restoreStatusFlags(X86::Emitter &emit, u32 mask)
+{
+    /// FIXME
+    // Cannot use
+    //   emit.OR(X86::esp(), X86::eax);
+    // as this generates the restricted R/MOD byte 0x04, for SIB addressing,
+    // which is not yet supported.
+    emit.POP(X86::eax);
+    emit.PUSHF();
+    emit.POP(X86::ecx);
+    emit.AND(X86::eax, mask);
+    emit.OR(X86::ecx, X86::eax);
+    emit.PUSH(X86::ecx);
+    emit.POPF();
+}
+
+/**
+ * Generate bytecode to set the Zero and Sign bits depending on the value
+ * in the given register \p r.
+ */
+static inline void testZeroSign(X86::Emitter &emit, const X86::Reg<u8> &r)
+{
+    emit.PUSHF();
+    emit.TEST(r, r);
+    restoreStatusFlags(emit, 0x801);
+}
+
 static inline bool ADC(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.ADC(Jit::A, r);
     return false;
 }
 
 static inline bool AND(X86::Emitter &emit, const X86::Reg<u8> &r) {
+    emit.PUSHF();
     emit.AND(Jit::A, r);
+    restoreStatusFlags(emit, 0x801);
     return false;
 }
 
@@ -215,15 +248,19 @@ static inline void PUSH(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.MOV(X86::eax, (u32)&currentState->stack);
     emit.MOV(X86::ecx, X86::eax());
     emit.MOV(X86::ecx(), r);
+    emit.PUSHF();
     emit.DEC(X86::cl); // Will wrap on stack overflow
+    emit.POPF();
     emit.MOV(X86::eax(), X86::ecx);
 }
 
 static inline void PULL(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.MOV(X86::eax, (u32)&currentState->stack);
     emit.MOV(X86::ecx, X86::eax());
-    emit.MOV(r, X86::ecx());
+    emit.PUSHF();
     emit.INC(X86::cl); // Will wrap on stack underflow
+    emit.POPF();
+    emit.MOV(r, X86::ecx());
     emit.MOV(X86::eax(), X86::ecx);
 }
 
@@ -236,16 +273,19 @@ static inline bool NOP(X86::Emitter &emit, const X86::Reg<u8> &r) {
 static inline bool BIT(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.PUSHF();
     emit.POP(X86::ecx);
-    emit.AND(X86::ecx, 0xfffff77f); // Clear Overflow and Sign flags.
+    emit.AND(X86::ecx, 0xfffff73f); // Clear Zero,Sign,Overflow flags.
     emit.MOV(X86::al, r);
-    emit.AND(X86::al, Jit::A);
     emit.AND(X86::al, 0x80);
-    emit.OR(X86::cl, X86::al);
+    emit.OR(X86::cl, X86::al); // OR bit 7 with N flag
     emit.MOV(X86::al, r);
-    emit.AND(X86::al, Jit::A);
     emit.SHL(X86::eax, 5);
     emit.AND(X86::ah, 0x8);
-    emit.OR(X86::ch, X86::ah);
+    emit.OR(X86::ch, X86::ah); // OR bit 6 with O flag
+    emit.TEST(r, Jit::A);
+    emit.PUSHF();
+    emit.POP(X86::eax);
+    emit.AND(X86::al, 0x40); // Keep zero flag.
+    emit.OR(X86::cl, X86::al);
     emit.PUSH(X86::ecx);
     emit.POPF();
     return false;
@@ -279,28 +319,28 @@ static inline void CLV(X86::Emitter &emit) {
 static inline bool LAX(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.MOV(Jit::A, r);
     emit.MOV(Jit::X, r);
-    emit.TEST(r, r);
+    testZeroSign(emit, r);
     return false;
 }
 
 static inline bool LDA(X86::Emitter &emit, const X86::Reg<u8> &r) {
     if (r != Jit::A)
         emit.MOV(Jit::A, r);
-    emit.TEST(Jit::A, Jit::A);
+    testZeroSign(emit, r);
     return false;
 }
 
 static inline bool LDX(X86::Emitter &emit, const X86::Reg<u8> &r) {
     if (r != Jit::X)
         emit.MOV(Jit::X, r);
-    emit.TEST(Jit::X, Jit::X);
+    testZeroSign(emit, Jit::X);
     return false;
 }
 
 static inline bool LDY(X86::Emitter &emit, const X86::Reg<u8> &r) {
     if (r != Jit::Y)
         emit.MOV(Jit::Y, r);
-    emit.TEST(Jit::Y, Jit::Y);
+    testZeroSign(emit, Jit::Y);
     return false;
 }
 
@@ -309,12 +349,32 @@ static inline void PHA(X86::Emitter &emit) {
 }
 
 static inline void PHP(X86::Emitter &emit) {
-    /// FIXME must extract status flags
-    throw "PHP unimplemented";
+    u8 *p = &currentState->regs.p;
+    emit.PUSHF();
+    emit.MOV(X86::eax, (u32)p);
+    emit.MOV(Jit::M, X86::eax());
+    emit.AND(Jit::M, 0x3c); // Clear Carry,Zero,Overflow,Sign flags
+    emit.POP(X86::ecx);
+    emit.PUSH(X86::ecx);
+    emit.AND(X86::cl, 0x81);
+    emit.OR(Jit::M, X86::cl);
+    emit.POP(X86::ecx);
+    emit.PUSH(X86::ecx);
+    emit.SHR(X86::ecx, 5);
+    emit.AND(X86::cl, 0x42);
+    emit.OR(Jit::M, X86::cl);
+    emit.MOV(X86::eax(), Jit::M); // TODO remove
+    emit.MOV(X86::eax, (u32)&currentState->stack);
+    emit.MOV(X86::ecx, X86::eax());
+    emit.MOV(X86::ecx(), Jit::M);
+    emit.DEC(X86::cl); // Will wrap on stack overflow
+    emit.MOV(X86::eax(), X86::ecx);
+    emit.POPF();
 }
 
 static inline void PLA(X86::Emitter &emit) {
     PULL(emit, Jit::A);
+    testZeroSign(emit, Jit::A);
 }
 
 static inline void PLP(X86::Emitter &emit) {
@@ -969,6 +1029,14 @@ Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
     : address(pc), opcode(opcode), next(NULL), jump(NULL)
 {
     nativeCode = emit.getPtr();
+
+    if (pc == 0xC7EB) {
+        branch = true;
+        emit.MOV(X86::eax, pc);
+        emit.PUSHF();
+        emit.POP(X86::ecx);
+        emit.RETN();
+    }
 
     /* Check jamming instructions. */
     if (Asm::instructions[opcode].jam) {
