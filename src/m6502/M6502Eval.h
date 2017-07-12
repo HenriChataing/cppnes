@@ -5,6 +5,9 @@
 #include "type.h"
 
 namespace M6502 {
+
+void trace(u8 opcode);
+
 namespace Eval {
 
 void runOpcode(u8 opcode);

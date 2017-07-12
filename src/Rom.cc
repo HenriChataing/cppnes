@@ -97,7 +97,7 @@ Rom::Rom(const char *file)
         r = ENOSYS;
         goto fail;
     } else {
-        std::cerr << "Selected mapper " << mapperType << std::endl;
+        std::cerr << "Selected mapper " << (int)mapperType << std::endl;
     }
 
     /* Allocate space for the cartridge memory. */

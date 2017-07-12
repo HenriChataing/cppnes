@@ -4,6 +4,7 @@
 
 #include "M6502Jit.h"
 #include "M6502State.h"
+#include "M6502Eval.h"
 #include "Memory.h"
 
 using namespace M6502;
@@ -91,6 +92,17 @@ const X86::Reg<u8> X = X86::bl;
 const X86::Reg<u8> Y = X86::bh;
 
 };
+
+/**
+ * Increment the cycle count.
+ */
+static void incrementCycles(X86::Emitter &emit, u32 upd)
+{
+    emit.MOV(X86::eax, (u32)&currentState->cycles);
+    emit.PUSHF();
+    emit.ADD(X86::eax(), upd);
+    emit.POPF();
+}
 
 /**
  * Generate bytecode to restore selected status flags from the a saved
@@ -1403,6 +1415,9 @@ Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
             // error("  opcode %02x\n", opcode);
             throw "Unsupported instruction";
     }
+
+    if (!branch)
+        incrementCycles(emit, Asm::instructions[opcode].cycles);
 }
 
 Instruction::~Instruction()
@@ -1428,15 +1443,16 @@ void Instruction::run()
 {
     Registers *regs = &currentState->regs;
 
-    std::cerr << std::hex << std::uppercase << std::setfill('0');
-    std::cerr << std::setw(4) << (int)address << "  ??        ???         ";
-    std::cerr << " A:" << std::setw(2) << (int)regs->a;
-    std::cerr << " X:" << std::setw(2) << (int)regs->x;
-    std::cerr << " Y:" << std::setw(2) << (int)regs->y;
-    std::cerr << " P:" << std::setw(2) << (int)regs->p;
-    std::cerr << " SP:" << std::setw(2) << (int)regs->sp;
-    std::cerr << " CYC:" << std::dec << currentState->cycles;
-    std::cerr << std::nouppercase << std::endl;
+    // std::cerr << std::hex << std::uppercase << std::setfill('0');
+    // std::cerr << std::setw(4) << (int)address << "  ??        ???         ";
+    // std::cerr << " A:" << std::setw(2) << (int)regs->a;
+    // std::cerr << " X:" << std::setw(2) << (int)regs->x;
+    // std::cerr << " Y:" << std::setw(2) << (int)regs->y;
+    // std::cerr << " P:" << std::setw(2) << (int)regs->p;
+    // std::cerr << " SP:" << std::setw(2) << (int)regs->sp;
+    // std::cerr << " CYC:" << std::dec << currentState->cycles;
+    // std::cerr << std::nouppercase << std::endl;
+    trace(opcode);
 
     currentState->stack = Memory::ram + 0x100 + regs->sp;
     asm (

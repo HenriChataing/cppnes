@@ -766,12 +766,14 @@ static u16 getIndirect(void) {
 #define CASE_UP_INX(op, fun)  CASE_UP_MEM(op##_INX, fun, getIndexedIndirectAddr)
 #define CASE_UP_INY(op, fun)  CASE_UP_MEM(op##_INY, fun, getIndirectIndexedAddr)
 
+namespace M6502 {
+
 /**
  * @brief Display debug information about the current instruction and the
  *   register state.
  * @param opcode first byte of the instruction pointed to by PC
  */
-static void trace(u8 opcode)
+void trace(u8 opcode)
 {
     u8 arg0, arg1;
     u16 jumpto;
@@ -879,7 +881,6 @@ static void trace(u8 opcode)
     std::cerr << std::nouppercase << std::endl;
 }
 
-namespace M6502 {
 namespace Eval {
 
 /**
