@@ -172,7 +172,12 @@ static inline bool AND(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool ASL(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    throw "ASL unimplemented";
+    /* Modified by restoreStatusFlags, possibly needed for write-back. */
+    emit.PUSH(X86::eax);
+    emit.PUSHF();
+    emit.SHL(r);
+    restoreStatusFlags(emit, 0x800);
+    emit.POP(X86::eax);
     return true;
 }
 
@@ -255,7 +260,12 @@ static inline bool ISB(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool LSR(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    throw "LSR unimplemented";
+    /* Modified by restoreStatusFlags, possibly needed for write-back. */
+    emit.PUSH(X86::eax);
+    emit.PUSHF();
+    emit.SHR(r);
+    restoreStatusFlags(emit, 0x800);
+    emit.POP(X86::eax);
     return true;
 }
 
@@ -273,12 +283,22 @@ static inline bool RLA(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool ROL(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    throw "ROL unimplemented";
+    /* Modified by restoreStatusFlags, possibly needed for write-back. */
+    emit.PUSH(X86::eax);
+    emit.PUSHF();
+    emit.ROL(r);
+    restoreStatusFlags(emit, 0x800);
+    emit.POP(X86::eax);
     return true;
 }
 
 static inline bool ROR(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    throw "ROR unimplemented";
+    /* Modified by restoreStatusFlags, possibly needed for write-back. */
+    emit.PUSH(X86::eax);
+    emit.PUSHF();
+    emit.ROR(r);
+    restoreStatusFlags(emit, 0x800);
+    emit.POP(X86::eax);
     return true;
 }
 
