@@ -45,7 +45,6 @@ Instruction *InstructionCache::cacheBlock(u16 address)
 
     Instruction *prev = NULL, *instr;
     u16 pc = address;
-    // const u8 *start = _asmEmitter.getPtr();
 
     while (true)
     {
@@ -69,10 +68,6 @@ Instruction *InstructionCache::cacheBlock(u16 address)
         prev = instr;
         pc += Asm::instructions[opcode].bytes;
     }
-
-    // std::cerr << "Generated code for ";
-    // std::cerr << std::hex << (int)address << " - " << (int)pc << std::endl;
-    // _asmEmitter.dump(start);
 
     return fetchInstruction(address);
 }
@@ -119,6 +114,7 @@ static void restoreStatusFlags(X86::Emitter &emit, u32 mask)
     emit.PUSHF();
     emit.POP(X86::ecx);
     emit.AND(X86::eax, mask);
+    emit.AND(X86::ecx, ~mask);
     emit.OR(X86::ecx, X86::eax);
     emit.PUSH(X86::ecx);
     emit.POPF();
@@ -152,17 +148,15 @@ static void compare(
     emit.POP(X86::ecx);
     /* Discard the overflow flag. */
     emit.AND(X86::eax, 0x800);
+    emit.AND(X86::ecx, 0xfffff7ff);
     emit.OR(X86::ecx, X86::eax);
     /*
-     * It is necessary to OR the carry flag with the zero flag, as the
-     * signification is slightly different for 6502 (set if greater OR equal)
+     * Complement the carry flag (the signification is opposite for
+     * 6502 (set if r0 greater than or equal to r1).
      */
-    emit.MOV(X86::al, X86::cl);
-    emit.SHR(X86::al, 6);
-    emit.AND(X86::al, 1);
-    emit.OR(X86::cl, X86::al);
     emit.PUSH(X86::ecx);
     emit.POPF();
+    emit.CMC();
 }
 
 static inline bool ADC(X86::Emitter &emit, const X86::Reg<u8> &r) {
@@ -204,34 +198,54 @@ static inline bool DCP(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool DEC(X86::Emitter &emit, const X86::Reg<u8> &r) {
+    /* Modified by restoreStatusFlags, possibly needed for write-back. */
+    emit.PUSH(X86::eax);
+    emit.PUSHF();
     emit.DEC(r);
+    restoreStatusFlags(emit, 0x800);
+    emit.POP(X86::eax);
     return true;
 }
 
 static inline void DEX(X86::Emitter &emit) {
+    emit.PUSHF();
     emit.DEC(Jit::X);
+    restoreStatusFlags(emit, 0x800);
 }
 
 static inline void DEY(X86::Emitter &emit) {
-    emit.DEC(Jit::X);
+    emit.PUSHF();
+    emit.DEC(Jit::Y);
+    restoreStatusFlags(emit, 0x800);
 }
 
 static inline bool EOR(X86::Emitter &emit, const X86::Reg<u8> &r) {
+    emit.PUSHF();
     emit.XOR(Jit::A, r);
+    restoreStatusFlags(emit, 0x801);
     return false;
 }
 
 static inline bool INC(X86::Emitter &emit, const X86::Reg<u8> &r) {
+    /* Modified by restoreStatusFlags, possibly needed for write-back. */
+    emit.PUSH(X86::eax);
+    emit.PUSHF();
     emit.INC(r);
+    restoreStatusFlags(emit, 0x800);
+    emit.POP(X86::eax);
     return true;
 }
 
 static inline void INX(X86::Emitter &emit) {
+    emit.PUSHF();
     emit.INC(Jit::X);
+    restoreStatusFlags(emit, 0x800);
 }
 
 static inline void INY(X86::Emitter &emit) {
+    emit.PUSHF();
     emit.INC(Jit::Y);
+    restoreStatusFlags(emit, 0x800);
 }
 
 /** Unofficial opcode, composition of INC and SBC. */
@@ -246,7 +260,9 @@ static inline bool LSR(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool ORA(X86::Emitter &emit, const X86::Reg<u8> &r) {
+    emit.PUSHF();
     emit.OR(Jit::A, r);
+    restoreStatusFlags(emit, 0x801);
     return false;
 }
 
@@ -272,7 +288,9 @@ static inline bool RRA(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool SBC(X86::Emitter &emit, const X86::Reg<u8> &r) {
+    emit.CMC();
     emit.SBB(Jit::A, r);
+    emit.CMC();
     return false;
 }
 
@@ -354,7 +372,11 @@ static inline void CLI(X86::Emitter &emit) {
 }
 
 static inline void CLV(X86::Emitter &emit) {
-    throw "CLV unimplemented";
+    emit.PUSHF();
+    emit.POP(X86::eax);
+    emit.AND(X86::eax, 0xfffff7ff);
+    emit.PUSH(X86::eax);
+    emit.POPF();
 }
 
 /** Unofficial instruction. */
@@ -395,7 +417,7 @@ static inline void PHP(X86::Emitter &emit) {
     emit.PUSHF();
     emit.MOV(X86::eax, (u32)p);
     emit.MOV(Jit::M, X86::eax());
-    emit.AND(Jit::M, 0x3c); // Clear Carry,Zero,Overflow,Sign flags
+    emit.AND(Jit::M, 0x3c); // Clear Carry, Zero, Overflow, Sign flags
     emit.POP(X86::ecx);
     emit.PUSH(X86::ecx);
     emit.AND(X86::cl, 0x81);
@@ -405,7 +427,6 @@ static inline void PHP(X86::Emitter &emit) {
     emit.SHR(X86::ecx, 5);
     emit.AND(X86::cl, 0x42);
     emit.OR(Jit::M, X86::cl);
-    emit.MOV(X86::eax(), Jit::M); // TODO remove
     emit.MOV(X86::eax, (u32)&currentState->stack);
     emit.MOV(X86::ecx, X86::eax());
     emit.MOV(X86::ecx(), Jit::M);
@@ -420,8 +441,30 @@ static inline void PLA(X86::Emitter &emit) {
 }
 
 static inline void PLP(X86::Emitter &emit) {
-    /// FIXME insert status flags
-    throw "PLP unimplemented";
+    u8 *p = &currentState->regs.p;
+    emit.PUSHF();
+    /* Unstack new flag values */
+    emit.MOV(X86::eax, (u32)&currentState->stack);
+    emit.MOV(X86::ecx, X86::eax());
+    emit.INC(X86::cl); // Will wrap on stack underflow
+    emit.MOV(Jit::M, X86::ecx());
+    emit.MOV(X86::eax(), X86::ecx);
+    /* Update Interrupt, Decimal, etc. flags in currentState memory. */
+    emit.MOV(X86::eax, (u32)p);
+    emit.MOV(X86::eax(), Jit::M);
+    /* Update x86 status flags. */
+    emit.POP(X86::ecx);
+    emit.AND(X86::ecx, 0xfffff73e); // Clear Carry, Zero, Sign, Overflow bits
+    emit.MOV(X86::al, Jit::M);
+    emit.AND(X86::al, 0x81);
+    emit.OR(X86::cl, X86::al);
+    emit.MOV(X86::eax, 0);
+    emit.MOV(X86::al, Jit::M);
+    emit.SHL(X86::eax, 5);
+    emit.AND(X86::eax, 0x840);
+    emit.OR(X86::ecx, X86::eax);
+    emit.PUSH(X86::ecx);
+    emit.POPF();
 }
 
 static inline void SEC(X86::Emitter &emit) {
@@ -453,11 +496,15 @@ static inline void TAY(X86::Emitter &emit) {
 }
 
 static inline void TSX(X86::Emitter &emit) {
-    throw "TSX unimplemented";
+    emit.MOV(X86::eax, (u32)&currentState->stack);
+    emit.MOV(X86::ecx, X86::eax());
+    emit.MOV(Jit::X, X86::cl);
+    testZeroSign(emit, Jit::X);
 }
 
 static inline void TXA(X86::Emitter &emit) {
     emit.MOV(Jit::A, Jit::X);
+    testZeroSign(emit, Jit::A);
 }
 
 static inline void TXS(X86::Emitter &emit) {
@@ -469,6 +516,7 @@ static inline void TXS(X86::Emitter &emit) {
 
 static inline void TYA(X86::Emitter &emit) {
     emit.MOV(Jit::A, Jit::Y);
+    testZeroSign(emit, Jit::A);
 }
 
 /**
@@ -1072,7 +1120,7 @@ Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
 {
     nativeCode = emit.getPtr();
 
-    // if (pc == 0xC7EB) {
+    // if (pc == 0xCBE9) {
     //     branch = true;
     //     emit.MOV(X86::eax, pc);
     //     emit.PUSHF();

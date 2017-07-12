@@ -135,6 +135,7 @@ class Emitter
         void SAHF() { put(0x9e); }
         void LAHF() { put(0x9f); }
         void CLC() { put(0xf8); }
+        void CMC() { put(0xf5); }
         void STC() { put(0xf9); }
 
         u32 *JO(const u8 *loc = NULL) { return jumpCond(0x70, 0x80, loc); }
