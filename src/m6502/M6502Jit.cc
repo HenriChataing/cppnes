@@ -286,8 +286,9 @@ static inline bool ROL(X86::Emitter &emit, const X86::Reg<u8> &r) {
     /* Modified by restoreStatusFlags, possibly needed for write-back. */
     emit.PUSH(X86::eax);
     emit.PUSHF();
-    emit.ROL(r);
+    emit.RCL(r);
     restoreStatusFlags(emit, 0x800);
+    testZeroSign(emit, r);
     emit.POP(X86::eax);
     return true;
 }
@@ -296,8 +297,9 @@ static inline bool ROR(X86::Emitter &emit, const X86::Reg<u8> &r) {
     /* Modified by restoreStatusFlags, possibly needed for write-back. */
     emit.PUSH(X86::eax);
     emit.PUSHF();
-    emit.ROR(r);
+    emit.RCR(r);
     restoreStatusFlags(emit, 0x800);
+    testZeroSign(emit, r);
     emit.POP(X86::eax);
     return true;
 }
@@ -1520,7 +1522,7 @@ void Instruction::run()
     // std::cerr << " SP:" << std::setw(2) << (int)regs->sp;
     // std::cerr << " CYC:" << std::dec << currentState->cycles;
     // std::cerr << std::nouppercase << std::endl;
-    trace(opcode);
+    // trace(opcode);
 
     currentState->stack = Memory::ram + 0x100 + regs->sp;
     asm (

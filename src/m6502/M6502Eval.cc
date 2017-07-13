@@ -889,7 +889,7 @@ namespace Eval {
 void runOpcode(u8 opcode)
 {
     /* Log present state and next instruction. */
-    trace(opcode);
+    // trace(opcode);
 
     /* Exclude jamming instructions. */
     if (Asm::instructions[opcode].jam) {

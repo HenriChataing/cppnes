@@ -311,6 +311,16 @@ class Emitter
         void ROR(const Reg<u32> &r, u8 s) { put(0xc1); put(0xc8 | r.code); put(s); }
         void ROR(const Mem &m, u8 s) { put(0xc1); put(0x08 | m.mode); put(m); put(s); }
 
+        void RCL(const Reg<u8> &r) { put(0xd0); put(0xd0 | r.code); }
+        void RCL(const Reg<u8> &r, u8 s) { put(0xc0); put(0xd0 | r.code); put(s); }
+        void RCL(const Reg<u32> &r, u8 s) { put(0xc1); put(0xd0 | r.code); put(s); }
+        void RCL(const Mem &m, u8 s) { put(0xc1); put(0x10 | m.mode); put(m); put(s); }
+
+        void RCR(const Reg<u8> &r) { put(0xd0); put(0xd8 | r.code); }
+        void RCR(const Reg<u8> &r, u8 s) { put(0xc0); put(0xd8 | r.code); put(s); }
+        void RCR(const Reg<u32> &r, u8 s) { put(0xc1); put(0xd8 | r.code); put(s); }
+        void RCR(const Mem &m, u8 s) { put(0xc1); put(0x18 | m.mode); put(m); put(s); }
+
     private:
         u8 *_codeBuffer;
         size_t _codeLength;
