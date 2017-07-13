@@ -17,11 +17,18 @@ class Instruction
         void setNext(Instruction *instr);
 
         u16 address;
+        u16 branchAddress;
         u8 opcode;
+        bool exit;
+        bool branch;
+
+        friend class InstructionCache;
+
+    private:
         Instruction *next;
         Instruction *jump;
-        const void *nativeCode;
-        bool branch;
+        const u8 *nativeCode;
+        u32 *nativeBranchAddress;
 };
 
 class InstructionCache

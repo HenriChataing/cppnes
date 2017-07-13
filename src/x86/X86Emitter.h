@@ -121,7 +121,7 @@ class Emitter
         void CALL(const Mem &m) { put(0xff); put(m.mode | 0x10); put(m); }
         void CALLF(const void *ptr) { put(0x9a); put((u32)ptr); }
         void CALLF(const void **ref) { put(0xff); put(0x18); put((u32)ref); }
-        u32 *JMP(const u8 *loc = NULL) { return jumpAbs(0xeb, 0xe8, loc); }
+        u32 *JMP(const u8 *loc = NULL) { return jumpAbs(0xeb, 0xe9, loc); }
         void JMP(const Reg<u32> &r) { put(0xff); put(r.code | 0xe0); }
         void JMP(const Mem &m) { put(0xff); put(m.mode | 0x20); put(m); }
         void JMPF(const void *ptr) { put(0xe9); put((u32)ptr); }

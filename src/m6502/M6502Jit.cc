@@ -1,11 +1,14 @@
 
 #include <iostream>
 #include <iomanip>
+#include <queue>
 
 #include "M6502Jit.h"
 #include "M6502State.h"
 #include "M6502Eval.h"
 #include "Memory.h"
+
+#define PAGE_DIFF(addr0, addr1) ((((addr0) ^ (addr1)) & 0xff00) != 0)
 
 using namespace M6502;
 
@@ -43,6 +46,7 @@ Instruction *InstructionCache::cacheBlock(u16 address)
     if (address < 0x8000)
         return NULL;
 
+    std::queue<Instruction *> queue;
     Instruction *prev = NULL, *instr;
     u16 pc = address;
 
@@ -64,7 +68,28 @@ Instruction *InstructionCache::cacheBlock(u16 address)
         if (prev != NULL)
             prev->next = instr;
         if (instr->branch)
-            break;
+            queue.push(instr);
+        if (instr->exit) {
+            /* Get the next uncompiled branch. */
+            while (!queue.empty()) {
+                instr = queue.front();
+                Instruction *branch = fetchInstruction(instr->branchAddress);
+                if (branch != NULL) {
+                    _asmEmitter.setJump(
+                        instr->nativeBranchAddress, branch->nativeCode);
+                } else
+                    break;
+                queue.pop();
+            }
+            if (queue.empty())
+                break;
+            queue.pop();
+            _asmEmitter.setJump(
+                instr->nativeBranchAddress, _asmEmitter.getPtr());
+            pc = instr->branchAddress;
+            prev = NULL;
+            continue;
+        }
         prev = instr;
         pc += Asm::instructions[opcode].bytes;
     }
@@ -1131,17 +1156,45 @@ static u16 getIndirect(void) {
 #define CASE_UP_INX(op, fun)  CASE_LD_MEM(op##_INX, loadIndexedIndirect, fun)
 #define CASE_UP_INY(op, fun)  CASE_LD_MEM(op##_INY, loadIndirectIndexed, fun)
 
+/** Create a banch instruction with the given condition. */
+#define CASE_BR(op, oppcond)                                                   \
+    case op##_REL: {                                                           \
+        u8 __off = Memory::load(pc + 1);                                       \
+        pc += Asm::instructions[op##_REL].bytes;                               \
+        if (__off & 0x80) {                                                    \
+            __off = ~__off + 1;                                                \
+            branchAddress = pc - __off;                                        \
+        } else                                                                 \
+            branchAddress = pc + __off;                                        \
+        u32 *__next = oppcond();                                               \
+        emit.MOV(X86::eax, (u32)&currentState->cycles);                        \
+        emit.PUSHF();                                                          \
+        emit.ADD(X86::eax(), (u32)(3 + PAGE_DIFF(pc, branchAddress)));         \
+        emit.POPF();                                                           \
+        nativeBranchAddress = emit.JMP();                                      \
+        emit.setJump(__next, emit.getPtr());                                   \
+        emit.MOV(X86::eax, (u32)&currentState->cycles);                        \
+        emit.PUSHF();                                                          \
+        emit.ADD(X86::eax(), (u32)2);                                          \
+        emit.POPF();                                                           \
+        branch = true;                                                         \
+        break;                                                                 \
+    }
+
 Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
     : address(pc), opcode(opcode), next(NULL), jump(NULL)
 {
     nativeCode = emit.getPtr();
+    branch = false;
+    exit = false;
 
-    // if (pc == 0xCBE9) {
-    //     branch = true;
+    // if (pc == 0xc731 || pc == 0xc72e) {
+    //     exit = true;
     //     emit.MOV(X86::eax, pc);
     //     emit.PUSHF();
     //     emit.POP(X86::ecx);
     //     emit.RETN();
+    //     return;
     // }
 
     /* Check jamming instructions. */
@@ -1155,26 +1208,27 @@ Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
     /* Interpret instruction. */
     switch (opcode)
     {
-        case BCC_REL:
-        case BCS_REL:
-        case BEQ_REL:
-        case BMI_REL:
-        case BNE_REL:
-        case BPL_REL:
         case BRK_IMP:
-        case BVC_REL:
-        case BVS_REL:
         case JMP_ABS:
         case JMP_IND:
         case JSR_ABS:
         case RTI_IMP:
         case RTS_IMP:
-            branch = true;
+            exit = true;
             emit.MOV(X86::eax, pc);
             emit.PUSHF();
             emit.POP(X86::ecx);
             emit.RETN();
             break;
+
+        CASE_BR(BCC, emit.JC);
+        CASE_BR(BCS, emit.JNC);
+        CASE_BR(BEQ, emit.JNZ);
+        CASE_BR(BMI, emit.JNS);
+        CASE_BR(BNE, emit.JZ);
+        CASE_BR(BPL, emit.JS);
+        CASE_BR(BVC, emit.JO);
+        CASE_BR(BVS, emit.JNO);
 
         CASE_LD_IMM(ADC, ADC);
         CASE_LD_ZPG(ADC, ADC);
@@ -1480,7 +1534,7 @@ Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
             throw "Unsupported instruction";
     }
 
-    if (!branch)
+    if (!exit && !branch)
         incrementCycles(emit, Asm::instructions[opcode].cycles);
 }
 
@@ -1506,7 +1560,7 @@ void Instruction::setNext(Instruction *instr)
 void Instruction::run()
 {
     Registers *regs = &currentState->regs;
-    // trace(opcode);
+    trace(opcode);
 
     currentState->stack = Memory::ram + 0x100 + regs->sp;
     asm (
