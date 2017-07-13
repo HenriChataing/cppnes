@@ -72,12 +72,6 @@ Instruction *InstructionCache::cacheBlock(u16 address)
     return fetchInstruction(address);
 }
 
-/**
- * x86 register allocation :
- *  - A: dl
- *  - X: bl
- *  - Y: bh
- */
 
 namespace Jit {
 
@@ -1512,16 +1506,6 @@ void Instruction::setNext(Instruction *instr)
 void Instruction::run()
 {
     Registers *regs = &currentState->regs;
-
-    // std::cerr << std::hex << std::uppercase << std::setfill('0');
-    // std::cerr << std::setw(4) << (int)address << "  ??        ???         ";
-    // std::cerr << " A:" << std::setw(2) << (int)regs->a;
-    // std::cerr << " X:" << std::setw(2) << (int)regs->x;
-    // std::cerr << " Y:" << std::setw(2) << (int)regs->y;
-    // std::cerr << " P:" << std::setw(2) << (int)regs->p;
-    // std::cerr << " SP:" << std::setw(2) << (int)regs->sp;
-    // std::cerr << " CYC:" << std::dec << currentState->cycles;
-    // std::cerr << std::nouppercase << std::endl;
     // trace(opcode);
 
     currentState->stack = Memory::ram + 0x100 + regs->sp;
