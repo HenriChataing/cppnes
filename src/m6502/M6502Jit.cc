@@ -46,6 +46,8 @@ Instruction *InstructionCache::cacheBlock(u16 address)
     if (address < 0x8000)
         return NULL;
 
+    // const u8 *start = _asmEmitter.getPtr();
+
     std::queue<Instruction *> queue;
     Instruction *prev = NULL, *instr;
     u16 pc = address;
@@ -94,6 +96,7 @@ Instruction *InstructionCache::cacheBlock(u16 address)
         pc += Asm::instructions[opcode].bytes;
     }
 
+    // _asmEmitter.dump(start);
     return fetchInstruction(address);
 }
 
@@ -113,30 +116,35 @@ const X86::Reg<u8> Y = X86::bh;
 static void incrementCycles(X86::Emitter &emit, u32 upd)
 {
     emit.MOV(X86::eax, (u32)&currentState->cycles);
-    emit.PUSHF();
     emit.ADD(X86::eax(), upd);
-    emit.POPF();
 }
 
 /**
- * Generate bytecode to restore selected status flags from the a saved
- * state pushed onto the stack (i.e. PUSHF)
+ * Generate bytecode to update selected status flags in the saved
+ * state pushed onto the stack.
  */
-static void restoreStatusFlags(X86::Emitter &emit, u32 mask)
+static void updateStatusFlags(X86::Emitter &emit, u32 mask)
 {
     /// FIXME
     // Cannot use
     //   emit.OR(X86::esp(), X86::eax);
     // as this generates the restricted R/MOD byte 0x04, for SIB addressing,
     // which is not yet supported.
-    emit.POP(X86::eax);
     emit.PUSHF();
     emit.POP(X86::ecx);
-    emit.AND(X86::eax, mask);
-    emit.AND(X86::ecx, ~mask);
-    emit.OR(X86::ecx, X86::eax);
-    emit.PUSH(X86::ecx);
+    emit.AND(X86::ecx, mask);
+    emit.AND(X86::esp(), ~mask);
+    emit.OR(X86::esp(), X86::ecx);
+}
+
+/**
+ * Generate bytecode to load the status flags from the saved
+ * state pushed onto the stack.
+ */
+static void restoreStatusFlags(X86::Emitter &emit)
+{
     emit.POPF();
+    emit.PUSHF();
 }
 
 /**
@@ -145,9 +153,8 @@ static void restoreStatusFlags(X86::Emitter &emit, u32 mask)
  */
 static void testZeroSign(X86::Emitter &emit, const X86::Reg<u8> &r)
 {
-    emit.PUSHF();
     emit.TEST(r, r);
-    restoreStatusFlags(emit, 0x801);
+    updateStatusFlags(emit, X86::zero | X86::sign);
 }
 
 /**
@@ -160,43 +167,31 @@ static void compare(
     const X86::Reg<u8> &r0,
     const X86::Reg<u8> &r1)
 {
-    emit.PUSHF();
-    emit.CMP(r0, r1);
-    emit.POP(X86::eax);
-    emit.PUSHF();
-    emit.POP(X86::ecx);
-    /* Discard the overflow flag. */
-    emit.AND(X86::eax, 0x800);
-    emit.AND(X86::ecx, 0xfffff7ff);
-    emit.OR(X86::ecx, X86::eax);
     /*
      * Complement the carry flag (the signification is opposite for
      * 6502 (set if r0 greater than or equal to r1).
      */
-    emit.PUSH(X86::ecx);
-    emit.POPF();
+    emit.CMP(r0, r1);
     emit.CMC();
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
 }
 
 static inline bool ADC(X86::Emitter &emit, const X86::Reg<u8> &r) {
+    emit.POPF();
     emit.ADC(Jit::A, r);
+    emit.PUSHF();
     return false;
 }
 
 static inline bool AND(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    emit.PUSHF();
     emit.AND(Jit::A, r);
-    restoreStatusFlags(emit, 0x801);
+    updateStatusFlags(emit, X86::zero | X86::sign);
     return false;
 }
 
 static inline bool ASL(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    /* Modified by restoreStatusFlags, possibly needed for write-back. */
-    emit.PUSH(X86::eax);
-    emit.PUSHF();
     emit.SHL(r);
-    restoreStatusFlags(emit, 0x800);
-    emit.POP(X86::eax);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
     return true;
 }
 
@@ -222,54 +217,41 @@ static inline bool DCP(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool DEC(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    /* Modified by restoreStatusFlags, possibly needed for write-back. */
-    emit.PUSH(X86::eax);
-    emit.PUSHF();
     emit.DEC(r);
-    restoreStatusFlags(emit, 0x800);
-    emit.POP(X86::eax);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
     return true;
 }
 
 static inline void DEX(X86::Emitter &emit) {
-    emit.PUSHF();
     emit.DEC(Jit::X);
-    restoreStatusFlags(emit, 0x800);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
 }
 
 static inline void DEY(X86::Emitter &emit) {
-    emit.PUSHF();
     emit.DEC(Jit::Y);
-    restoreStatusFlags(emit, 0x800);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
 }
 
 static inline bool EOR(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    emit.PUSHF();
     emit.XOR(Jit::A, r);
-    restoreStatusFlags(emit, 0x801);
+    updateStatusFlags(emit, X86::zero | X86::sign);
     return false;
 }
 
 static inline bool INC(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    /* Modified by restoreStatusFlags, possibly needed for write-back. */
-    emit.PUSH(X86::eax);
-    emit.PUSHF();
     emit.INC(r);
-    restoreStatusFlags(emit, 0x800);
-    emit.POP(X86::eax);
+    updateStatusFlags(emit, X86::zero | X86::sign);
     return true;
 }
 
 static inline void INX(X86::Emitter &emit) {
-    emit.PUSHF();
     emit.INC(Jit::X);
-    restoreStatusFlags(emit, 0x800);
+    updateStatusFlags(emit, X86::zero | X86::sign);
 }
 
 static inline void INY(X86::Emitter &emit) {
-    emit.PUSHF();
     emit.INC(Jit::Y);
-    restoreStatusFlags(emit, 0x800);
+    updateStatusFlags(emit, X86::zero | X86::sign);
 }
 
 /** Unofficial opcode, composition of INC and SBC. */
@@ -279,19 +261,14 @@ static inline bool ISB(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool LSR(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    /* Modified by restoreStatusFlags, possibly needed for write-back. */
-    emit.PUSH(X86::eax);
-    emit.PUSHF();
     emit.SHR(r);
-    restoreStatusFlags(emit, 0x800);
-    emit.POP(X86::eax);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
     return true;
 }
 
 static inline bool ORA(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    emit.PUSHF();
     emit.OR(Jit::A, r);
-    restoreStatusFlags(emit, 0x801);
+    updateStatusFlags(emit, X86::zero | X86::sign);
     return false;
 }
 
@@ -302,24 +279,18 @@ static inline bool RLA(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool ROL(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    /* Modified by restoreStatusFlags, possibly needed for write-back. */
-    emit.PUSH(X86::eax);
-    emit.PUSHF();
+    restoreStatusFlags(emit);
     emit.RCL(r);
-    restoreStatusFlags(emit, 0x800);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
     testZeroSign(emit, r);
-    emit.POP(X86::eax);
     return true;
 }
 
 static inline bool ROR(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    /* Modified by restoreStatusFlags, possibly needed for write-back. */
-    emit.PUSH(X86::eax);
-    emit.PUSHF();
+    restoreStatusFlags(emit);
     emit.RCR(r);
-    restoreStatusFlags(emit, 0x800);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
     testZeroSign(emit, r);
-    emit.POP(X86::eax);
     return true;
 }
 
@@ -329,9 +300,11 @@ static inline bool RRA(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool SBC(X86::Emitter &emit, const X86::Reg<u8> &r) {
+    emit.POPF();
     emit.CMC();
     emit.SBB(Jit::A, r);
     emit.CMC();
+    emit.PUSHF();
     return false;
 }
 
@@ -349,18 +322,14 @@ static inline void PUSH(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.MOV(X86::eax, (u32)&currentState->stack);
     emit.MOV(X86::ecx, X86::eax());
     emit.MOV(X86::ecx(), r);
-    emit.PUSHF();
     emit.DEC(X86::cl); // Will wrap on stack overflow
-    emit.POPF();
     emit.MOV(X86::eax(), X86::ecx);
 }
 
 static inline void PULL(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.MOV(X86::eax, (u32)&currentState->stack);
     emit.MOV(X86::ecx, X86::eax());
-    emit.PUSHF();
     emit.INC(X86::cl); // Will wrap on stack underflow
-    emit.POPF();
     emit.MOV(r, X86::ecx());
     emit.MOV(X86::eax(), X86::ecx);
 }
@@ -372,7 +341,6 @@ static inline bool NOP(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline bool BIT(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    emit.PUSHF();
     emit.POP(X86::ecx);
     emit.AND(X86::ecx, 0xfffff73f); // Clear Zero,Sign,Overflow flags.
     emit.MOV(X86::al, r);
@@ -388,36 +356,31 @@ static inline bool BIT(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.AND(X86::al, 0x40); // Keep zero flag.
     emit.OR(X86::cl, X86::al);
     emit.PUSH(X86::ecx);
-    emit.POPF();
     return false;
 }
 
 static inline void CLC(X86::Emitter &emit) {
+    emit.POPF();
     emit.CLC();
+    emit.PUSHF();
 }
 
 static inline void CLD(X86::Emitter &emit) {
     u8 *p = &currentState->regs.p;
     emit.MOV(X86::eax, (u32)p);
-    emit.PUSHF();
     emit.AND(X86::eax(), (u8)0xf7);
-    emit.POPF();
 }
 
 static inline void CLI(X86::Emitter &emit) {
     u8 *p = &currentState->regs.p;
     emit.MOV(X86::eax, (u32)p);
-    emit.PUSHF();
     emit.AND(X86::eax(), (u8)0xfb);
-    emit.POPF();
 }
 
 static inline void CLV(X86::Emitter &emit) {
-    emit.PUSHF();
     emit.POP(X86::eax);
     emit.AND(X86::eax, 0xfffff7ff);
     emit.PUSH(X86::eax);
-    emit.POPF();
 }
 
 /** Unofficial instruction. */
@@ -455,7 +418,6 @@ static inline void PHA(X86::Emitter &emit) {
 
 static inline void PHP(X86::Emitter &emit) {
     u8 *p = &currentState->regs.p;
-    emit.PUSHF();
     emit.MOV(X86::eax, (u32)p);
     emit.MOV(Jit::M, X86::eax());
     emit.AND(Jit::M, 0x3c); // Clear Carry, Zero, Overflow, Sign flags
@@ -473,7 +435,6 @@ static inline void PHP(X86::Emitter &emit) {
     emit.MOV(X86::ecx(), Jit::M);
     emit.DEC(X86::cl); // Will wrap on stack overflow
     emit.MOV(X86::eax(), X86::ecx);
-    emit.POPF();
 }
 
 static inline void PLA(X86::Emitter &emit) {
@@ -483,7 +444,6 @@ static inline void PLA(X86::Emitter &emit) {
 
 static inline void PLP(X86::Emitter &emit) {
     u8 *p = &currentState->regs.p;
-    emit.PUSHF();
     /* Unstack new flag values */
     emit.MOV(X86::eax, (u32)&currentState->stack);
     emit.MOV(X86::ecx, X86::eax());
@@ -505,27 +465,24 @@ static inline void PLP(X86::Emitter &emit) {
     emit.AND(X86::eax, 0x840);
     emit.OR(X86::ecx, X86::eax);
     emit.PUSH(X86::ecx);
-    emit.POPF();
 }
 
 static inline void SEC(X86::Emitter &emit) {
+    emit.POPF();
     emit.STC();
+    emit.PUSHF();
 }
 
 static inline void SED(X86::Emitter &emit) {
     u8 *p = &currentState->regs.p;
     emit.MOV(X86::eax, (u32)p);
-    emit.PUSHF();
     emit.OR(X86::eax(), (u8)0x8);
-    emit.POPF();
 }
 
 static inline void SEI(X86::Emitter &emit) {
     u8 *p = &currentState->regs.p;
     emit.MOV(X86::eax, (u32)p);
-    emit.PUSHF();
     emit.OR(X86::eax(), (u8)0x4);
-    emit.POPF();
 }
 
 static inline void TAX(X86::Emitter &emit) {
@@ -676,9 +633,7 @@ static void loadZeroPageX(
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
-    emit.PUSHF();
     emit.ADD(X86::al, Jit::X);
-    emit.POPF();
     emit.MOV(Jit::M, X86::eax());
     bool wb = cont(emit, Jit::M);
     if (wb)
@@ -693,9 +648,7 @@ static void storeZeroPageX(
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
-    emit.PUSHF();
     emit.ADD(X86::al, Jit::X);
-    emit.POPF();
     emit.MOV(X86::eax(), r);
 }
 
@@ -708,9 +661,7 @@ static void loadZeroPageY(
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
-    emit.PUSHF();
     emit.ADD(X86::al, Jit::Y);
-    emit.POPF();
     emit.MOV(Jit::M, X86::eax());
     bool wb = cont(emit, Jit::M);
     if (wb)
@@ -725,9 +676,7 @@ static void storeZeroPageY(
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
-    emit.PUSHF();
     emit.ADD(X86::al, Jit::Y);
-    emit.POPF();
     emit.MOV(X86::eax(), r);
 }
 
@@ -738,23 +687,19 @@ static void loadAbsolute(
     const X86::Reg<u8> &r)
 {
     u16 addr = Memory::loadw(pc + 1);
-    emit.PUSHF();
     emit.PUSH(X86::edx);
     emit.PUSH((u32)addr);
     emit.CALL((u8 *)Memory::load);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
-    emit.POPF();
     emit.MOV(Jit::M, X86::al);
     bool wb = cont(emit, Jit::M);
     if (wb) {
-        emit.PUSHF();
         emit.PUSH(X86::edx);
         emit.PUSH((u32)addr);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
-        emit.POPF();
     }
 }
 
@@ -766,13 +711,11 @@ static void storeAbsolute(
     u16 addr = Memory::loadw(pc + 1);
     if (r != Jit::M)
         emit.MOV(Jit::M, r);
-    emit.PUSHF();
     emit.PUSH(X86::edx);
     emit.PUSH((u32)addr);
     emit.CALL((u8 *)Memory::store);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
-    emit.POPF();
 }
 
 /**
@@ -789,25 +732,21 @@ static void loadAbsoluteX(
 {
     u16 addr = Memory::loadw(pc + 1);
     emit.MOV(X86::eax, (u32)addr);
-    emit.PUSHF();
     emit.ADD(X86::al, Jit::X);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::load);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
-    emit.POPF();
     emit.MOV(Jit::M, X86::al);
     /// TODO check carry bit, if 1 add cycle and repeat load
     bool wb = cont(emit, Jit::M);
     if (wb) {
-        emit.PUSHF();
         emit.PUSH(X86::edx);
         emit.PUSH(X86::ecx);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
-        emit.POPF();
     }
 
     // u16 addrX = addr + X;
@@ -828,14 +767,12 @@ static void storeAbsoluteX(
     emit.MOV(X86::eax, (u32)addr);
     emit.MOV(X86::ecx, 0);
     emit.MOV(X86::cl, Jit::X);
-    emit.PUSHF();
     emit.ADD(X86::eax, X86::ecx);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::store);
     emit.POP(X86::eax);
     emit.POP(X86::edx);
-    emit.POPF();
 }
 
 /**
@@ -852,25 +789,21 @@ static void loadAbsoluteY(
 {
     u16 addr = Memory::loadw(pc + 1);
     emit.MOV(X86::eax, (u32)addr);
-    emit.PUSHF();
     emit.ADD(X86::al, Jit::Y);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::load);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
-    emit.POPF();
     emit.MOV(Jit::M, X86::al);
     /// TODO check carry bit, if 1 add cycle and repeat load
     bool wb = cont(emit, Jit::M);
     if (wb) {
-        emit.PUSHF();
         emit.PUSH(X86::edx);
         emit.PUSH(X86::ecx);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
-        emit.POPF();
     }
 
     // u16 addrY = addr + Y;
@@ -891,14 +824,12 @@ static void storeAbsoluteY(
     emit.MOV(X86::eax, (u32)addr);
     emit.MOV(X86::ecx, 0);
     emit.MOV(X86::cl, Jit::Y);
-    emit.PUSHF();
     emit.ADD(X86::eax, X86::ecx);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::store);
     emit.POP(X86::eax);
     emit.POP(X86::edx);
-    emit.POPF();
 }
 
 static void loadIndexedIndirect(
@@ -911,7 +842,6 @@ static void loadIndexedIndirect(
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.MOV(X86::ecx, 0);
-    emit.PUSHF();
     emit.ADD(X86::al, Jit::X);
     emit.MOV(X86::cl, X86::eax());
     emit.INC(X86::al);
@@ -921,18 +851,15 @@ static void loadIndexedIndirect(
     emit.CALL((u8 *)Memory::load);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
-    emit.POPF();
     emit.MOV(Jit::M, X86::al);
     /// TODO popf
     bool wb = cont(emit, Jit::M);
     if (wb) {
-        emit.PUSHF();
         emit.PUSH(X86::edx);
         emit.PUSH(X86::ecx);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
-        emit.POPF();
     }
 }
 
@@ -947,7 +874,6 @@ static void storeIndexedIndirect(
         emit.MOV(Jit::M, r);
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.MOV(X86::ecx, 0);
-    emit.PUSHF();
     emit.ADD(X86::al, Jit::X);
     emit.MOV(X86::cl, X86::eax());
     emit.INC(X86::al);
@@ -957,7 +883,6 @@ static void storeIndexedIndirect(
     emit.CALL((u8 *)Memory::store);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
-    emit.POPF();
 }
 
 /**
@@ -976,7 +901,6 @@ static void loadIndirectIndexed(
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.MOV(X86::ecx, 0);
-    emit.PUSHF();
     emit.MOV(X86::cl, X86::eax());
     emit.INC(X86::al);
     emit.MOV(X86::ch, X86::eax());
@@ -987,17 +911,14 @@ static void loadIndirectIndexed(
     emit.CALL((u8 *)Memory::load);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
-    emit.POPF();
     emit.MOV(Jit::M, X86::al);
     bool wb = cont(emit, Jit::M);
     if (wb) {
-        emit.PUSHF();
         emit.PUSH(X86::edx);
         emit.PUSH(X86::ecx);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
-        emit.POPF();
     }
 
     // u16 addr = Memory::load(PC + 1), addrY;
@@ -1026,7 +947,6 @@ static void storeIndirectIndexed(
         emit.MOV(Jit::M, r);
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.MOV(X86::ecx, 0);
-    emit.PUSHF();
     emit.MOV(X86::cl, X86::eax());
     emit.INC(X86::al);
     emit.MOV(X86::ch, X86::eax());
@@ -1037,7 +957,6 @@ static void storeIndirectIndexed(
     emit.CALL((u8 *)Memory::store);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
-    emit.POPF();
 
     // u16 addr = Memory::load(PC + 1), addrY;
     // addr = Memory::loadzw(addr);
@@ -1166,17 +1085,16 @@ static u16 getIndirect(void) {
             branchAddress = pc - __off;                                        \
         } else                                                                 \
             branchAddress = pc + __off;                                        \
-        u32 *__next = oppcond();                                               \
-        emit.MOV(X86::eax, (u32)&currentState->cycles);                        \
-        emit.PUSHF();                                                          \
-        emit.ADD(X86::eax(), (u32)(3 + PAGE_DIFF(pc, branchAddress)));         \
         emit.POPF();                                                           \
+        u32 *__next = oppcond();                                               \
+        emit.PUSHF();                                                          \
+        emit.MOV(X86::eax, (u32)&currentState->cycles);                        \
+        emit.ADD(X86::eax(), (u32)(3 + PAGE_DIFF(pc, branchAddress)));         \
         nativeBranchAddress = emit.JMP();                                      \
         emit.setJump(__next, emit.getPtr());                                   \
-        emit.MOV(X86::eax, (u32)&currentState->cycles);                        \
         emit.PUSHF();                                                          \
+        emit.MOV(X86::eax, (u32)&currentState->cycles);                        \
         emit.ADD(X86::eax(), (u32)2);                                          \
-        emit.POPF();                                                           \
         branch = true;                                                         \
         break;                                                                 \
     }
@@ -1188,11 +1106,10 @@ Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
     branch = false;
     exit = false;
 
-    // if (pc == 0xc731 || pc == 0xc72e) {
+    // if (pc == 0xcc1e) {
     //     exit = true;
     //     emit.MOV(X86::eax, pc);
-    //     emit.PUSHF();
-    //     emit.POP(X86::ecx);
+    //     emit.POPF();
     //     emit.RETN();
     //     return;
     // }
@@ -1214,10 +1131,18 @@ Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
         case JSR_ABS:
         case RTI_IMP:
         case RTS_IMP:
+        // case BCC_REL:
+        // case BCS_REL:
+        // case BEQ_REL:
+        // case BMI_REL:
+        // case BNE_REL:
+        // case BPL_REL:
+        // case BVC_REL:
+        // case BVS_REL:
+
             exit = true;
             emit.MOV(X86::eax, pc);
-            emit.PUSHF();
-            emit.POP(X86::ecx);
+            emit.POPF();
             emit.RETN();
             break;
 
@@ -1560,7 +1485,7 @@ void Instruction::setNext(Instruction *instr)
 void Instruction::run()
 {
     Registers *regs = &currentState->regs;
-    trace(opcode);
+    // trace(opcode);
 
     currentState->stack = Memory::ram + 0x100 + regs->sp;
     asm (
@@ -1585,7 +1510,7 @@ void Instruction::run()
         "mov 1(%%ecx), %%bl\n"
         "mov 2(%%ecx), %%bh\n"
         /* Jump to native code */
-        "call *%1\n"
+        "call asm_prefix%=\n"
         /* Store A,X,Y registers */
         "pop %%ecx\n"
         "mov %%dh, (%%ecx)\n"
@@ -1605,6 +1530,11 @@ void Instruction::run()
         "and $0x42, %%dl\n"
         "or %%dl, %%bl\n"
         "mov %%bl, 3(%%ecx)\n"
+        "jmp asm_exit%=\n"
+        "asm_prefix%=:\n"       // Push the flags before JMPing to the
+        "pushf\n"               // compiled code
+        "jmp *%1\n"
+        "asm_exit%=:\n"
         :
         : "c" (regs), "r" (nativeCode)
         : "%edx", "%ebx");

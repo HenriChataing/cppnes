@@ -41,6 +41,8 @@ class InstructionCache
         Instruction *cacheInstruction(u16 address, u8 opcode);
         Instruction *cacheBlock(u16 address);
 
+        size_t getSize() const { return _asmEmitter.getSize(); }
+
     private:
         X86::Emitter _asmEmitter;
         Instruction **_cache;

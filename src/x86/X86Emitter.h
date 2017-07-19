@@ -106,6 +106,11 @@ extern Reg<u8> ch;
 extern Reg<u8> dh;
 extern Reg<u8> bh;
 
+static const u32 carry    = 1l << 0;
+static const u32 zero     = 1l << 6;
+static const u32 sign     = 1l << 7;
+static const u32 overflow = 1l << 11;
+
 class Emitter
 {
     public:
@@ -113,6 +118,7 @@ class Emitter
         ~Emitter();
 
         const u8 *getPtr() const { return _codeBuffer + _codeLength; }
+        size_t getSize() const { return _codeLength; }
         void dump() const;
         void dump(const u8 *start) const;
 
@@ -337,16 +343,28 @@ class Emitter
             put(op | 0x1); put(0xc0 | (r1.code << 3) | r0.code);
         }
         inline void binop(u8 op, const Mem &m, const Reg<u8> &r) {
-            put(op); put((r.code << 3) | m.mode); put(m);
+            put(op); put((r.code << 3) | m.mode);
+            if ((m.mode & 0x7) == 0x4)
+                put(0x24); // SIB byte to reference ESP
+            put(m);
         }
         inline void binop(u8 op, const Mem &m, const Reg<u32> &r) {
-            put(op | 0x1); put((r.code << 3) | m.mode); put(m);
+            put(op | 0x1); put((r.code << 3) | m.mode);
+            if ((m.mode & 0x7) == 0x4)
+                put(0x24); // SIB byte to reference ESP
+            put(m);
         }
         inline void binop(u8 op, const Reg<u8> &r, const Mem &m) {
-            put(op | 0x2); put((r.code << 3) | m.mode); put(m);
+            put(op | 0x2); put((r.code << 3) | m.mode);
+            if ((m.mode & 0x7) == 0x4)
+                put(0x24); // SIB byte to reference ESP
+            put(m);
         }
         inline void binop(u8 op, const Reg<u32> &r, const Mem &m) {
-            put(op | 0x3); put((r.code << 3) | m.mode); put(m);
+            put(op | 0x3); put((r.code << 3) | m.mode);
+            if ((m.mode & 0x7) == 0x4)
+                put(0x24); // SIB byte to reference ESP
+            put(m);
         }
         /* The register AL benefits from a shorter encoding. */
         inline void binop(u8 ops, u8 opl, u8 opx, const Reg<u8> &r, u8 v) {
@@ -357,7 +375,10 @@ class Emitter
             }
         }
         inline void binop(u8 op, u8 opx, const Mem &m, u8 v) {
-            put(op); put(m.mode | (opx << 3)); put(m); put(v);
+            put(op); put(m.mode | (opx << 3));
+            if ((m.mode & 0x7) == 0x4)
+                put(0x24); // SIB byte to reference ESP
+            put(m); put(v);
         }
         /* The register EAX benefits from a shorter encoding. */
         inline void binop(u8 ops, u8 opl, u8 opx, const Reg<u32> &r, u32 v) {
@@ -368,7 +389,10 @@ class Emitter
             }
         }
         inline void binop(u8 op, u8 opx, const Mem &m, u32 v) {
-            put(op | 0x1); put(m.mode | (opx << 3)); put(m); put(v);
+            put(op | 0x1); put(m.mode | (opx << 3));
+            if ((m.mode & 0x7) == 0x4)
+                put(0x24); // SIB byte to reference ESP
+            put(m); put(v);
         }
 
         inline void put(u8 b) {
