@@ -1,7 +1,6 @@
 
 #include <iostream>
 #include <iomanip>
-#include <queue>
 
 #include "M6502Jit.h"
 #include "M6502State.h"
@@ -48,7 +47,6 @@ Instruction *InstructionCache::cacheBlock(u16 address)
 
     // const u8 *start = _asmEmitter.getPtr();
 
-    std::queue<Instruction *> queue;
     Instruction *prev = NULL, *instr;
     u16 pc = address;
 
@@ -70,22 +68,22 @@ Instruction *InstructionCache::cacheBlock(u16 address)
         if (prev != NULL)
             prev->next = instr;
         if (instr->branch)
-            queue.push(instr);
+            _queue.push(instr);
         if (instr->exit) {
             /* Get the next uncompiled branch. */
-            while (!queue.empty()) {
-                instr = queue.front();
+            while (!_queue.empty()) {
+                instr = _queue.front();
                 Instruction *branch = fetchInstruction(instr->branchAddress);
                 if (branch != NULL) {
                     _asmEmitter.setJump(
                         instr->nativeBranchAddress, branch->nativeCode);
                 } else
                     break;
-                queue.pop();
+                _queue.pop();
             }
-            if (queue.empty())
+            if (_queue.empty())
                 break;
-            queue.pop();
+            _queue.pop();
             _asmEmitter.setJump(
                 instr->nativeBranchAddress, _asmEmitter.getPtr());
             pc = instr->branchAddress;

@@ -2,6 +2,8 @@
 #ifndef _M6502JIT_H_INCLUDED_
 #define _M6502JIT_H_INCLUDED_
 
+#include <queue>
+
 #include "M6502Asm.h"
 #include "X86Emitter.h"
 #include "type.h"
@@ -47,6 +49,7 @@ class InstructionCache
         X86::Emitter _asmEmitter;
         Instruction **_cache;
         size_t _cacheSize;
+        std::queue<Instruction *> _queue;
 };
 
 };
