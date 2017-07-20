@@ -46,6 +46,14 @@ Emitter::Emitter(size_t codeSize)
     _codeLength = 0;
     int r;
 
+#if 0
+    _codeBuffer = (u8 *)mmap(NULL, _codeSize,
+        PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
+    if (_codeBuffer == MAP_FAILED) {
+        std::cerr << "Cannot allocate mmap memory" << std::endl;
+        throw "Emitter mmap failure";
+    }
+#else
     /* Allocate page aligned code buffer. */
     r = posix_memalign((void **)&_codeBuffer, 0x1000, _codeSize);
     if (r != 0) {
@@ -69,6 +77,7 @@ Emitter::Emitter(size_t codeSize)
         std::cerr << _codeBuffer << " (" << strerror(errno) << ")" << std::endl;
         throw "Emitter mprotect failure";
     }
+#endif
 }
 
 Emitter::~Emitter()
