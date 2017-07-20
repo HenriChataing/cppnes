@@ -22,6 +22,7 @@ class State
         State();
         ~State();
 
+        void clear();
         void reset();
 
         /** CPU registers. */
