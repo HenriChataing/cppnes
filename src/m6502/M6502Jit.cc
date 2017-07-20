@@ -383,8 +383,10 @@ static inline void CLV(X86::Emitter &emit) {
 
 /** Unofficial instruction. */
 static inline bool LAX(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    emit.MOV(Jit::A, r);
-    emit.MOV(Jit::X, r);
+    if (r != Jit::A)
+        emit.MOV(Jit::A, r);
+    if (r != Jit::X)
+        emit.MOV(Jit::X, r);
     testZeroSign(emit, r);
     return false;
 }
@@ -588,13 +590,9 @@ static void loadImmediate(
     Operation cont,
     const X86::Reg<u8> &r)
 {
-    emit.MOV(Jit::M, Memory::load(pc + 1));
-    cont(emit, Jit::M);
+    emit.MOV(r, Memory::load(pc + 1));
+    cont(emit, r);
 }
-
-// static void getImmediate(X86::Emitter &emit, u16 pc) {
-//     emit.MOV(Jit::M, Memory::load(pc + 1));
-// }
 
 static void loadZeroPage(
     X86::Emitter &emit,
@@ -605,10 +603,10 @@ static void loadZeroPage(
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
-    emit.MOV(Jit::M, X86::eax());
-    bool wb = cont(emit, Jit::M);
+    emit.MOV(r, X86::eax());
+    bool wb = cont(emit, r);
     if (wb)
-        emit.MOV(X86::eax(), Jit::M);
+        emit.MOV(X86::eax(), r);
 }
 
 static void storeZeroPage(
@@ -632,10 +630,10 @@ static void loadZeroPageX(
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.ADD(X86::al, Jit::X);
-    emit.MOV(Jit::M, X86::eax());
-    bool wb = cont(emit, Jit::M);
+    emit.MOV(r, X86::eax());
+    bool wb = cont(emit, r);
     if (wb)
-        emit.MOV(X86::eax(), Jit::M);
+        emit.MOV(X86::eax(), r);
 }
 
 static void storeZeroPageX(
@@ -660,10 +658,10 @@ static void loadZeroPageY(
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.ADD(X86::al, Jit::Y);
-    emit.MOV(Jit::M, X86::eax());
-    bool wb = cont(emit, Jit::M);
+    emit.MOV(r, X86::eax());
+    bool wb = cont(emit, r);
     if (wb)
-        emit.MOV(X86::eax(), Jit::M);
+        emit.MOV(X86::eax(), r);
 }
 
 static void storeZeroPageY(
@@ -850,7 +848,6 @@ static void loadIndexedIndirect(
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
-    /// TODO popf
     bool wb = cont(emit, Jit::M);
     if (wb) {
         emit.PUSH(X86::edx);
@@ -1482,9 +1479,11 @@ void Instruction::setNext(Instruction *instr)
  */
 void Instruction::run()
 {
-    Registers *regs = &currentState->regs;
-    // trace(opcode);
+    if (exit)
+        return;
 
+    // trace(opcode);
+    Registers *regs = &currentState->regs;
     currentState->stack = Memory::ram + 0x100 + regs->sp;
     asm (
         /* Save pointer to regs (scratched by compiled code) */
