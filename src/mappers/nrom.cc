@@ -31,6 +31,7 @@ class NROM: public Mapper
                 Memory::prgBank[0] = rom->prgRom;
                 Memory::prgBank[1] = rom->prgRom;
             }
+            Memory::chrRom = rom->chrRom;
         }
 
         ~NROM() {
