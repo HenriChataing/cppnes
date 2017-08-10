@@ -3,6 +3,8 @@
 
 #include "Memory.h"
 #include "Mapper.h"
+#include "N2C02State.h"
+#include "Joypad.h"
 
 using namespace Memory;
 
@@ -23,6 +25,11 @@ uint prgBankShift;
 u16 prgBankMax;
 u16 prgBankMask;
 u8 *prgBank[4];
+
+/**
+ * CHR rom, addresses 0x0000-0x1fff of the PPU address space
+ */
+u8 *chrRom;
 
 /**
  * PRG ram, addresses 0x6000-0x7fff
@@ -47,12 +54,10 @@ u8 load(u16 addr)
         return ram[addr & 0x7ff];
     else
     if (addr < 0x4000)
-        // return readPPURegister(addr);
-        return 0x0;
+        return N2C02::currentState->readRegister(addr);
     else
     if (addr == JOYPAD1_ADDR)
-        // return readJoypadRegister();
-        return 0x0;
+        return Joypad::currentJoypad->readRegister();
     else
     if (addr == OAMDMA_ADDR)
         return 0x0;
@@ -89,12 +94,10 @@ void store(u16 addr, u8 val)
         currentMapper->storePrg(addr, val);
     else
     if (addr < 0x4000)
-        // writePPURegister(addr, val);
-        return;
+        N2C02::currentState->writeRegister(addr, val);
     else
     if (addr == JOYPAD1_ADDR)
-        // writeJoypadRegister(val);
-        return;
+        Joypad::currentJoypad->writeRegister(val);
     else
     if (addr == OAMDMA_ADDR)
         // writeOAMDMARegister(val);
