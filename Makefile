@@ -7,14 +7,15 @@ BINDIR := bin
 EXE    := nes
 
 CFLAGS := -Wall -Wno-unused-function -m32 -std=c++11 -g -pg
-CFLAGS += -I$(SRCDIR) -I$(SRCDIR)/m6502 -I$(SRCDIR)/x86
+CFLAGS += -I$(SRCDIR) -I$(SRCDIR)/m6502 -I$(SRCDIR)/n2C02 -I$(SRCDIR)/x86
 LFLAGS := -pg -m32
-LIBS   :=
+LIBS   := -lSDL2 -lpthread
 
 SRC    := x86/X86Emitter.cc
 SRC    += m6502/M6502State.cc m6502/M6502Eval.cc m6502/M6502Asm.cc m6502/M6502Jit.cc
+SRC    += n2C02/N2C02State.cc
 SRC    += mappers/nrom.cc
-SRC    += Memory.cc Rom.cc Core.cc main.cc
+SRC    += Memory.cc Events.cc Joypad.cc Rom.cc Core.cc main.cc
 
 OBJS   := $(patsubst %.cc,$(OBJDIR)/%.o, $(SRC))
 DEPS   := $(patsubst %.cc,$(OBJDIR)/%.d, $(SRC))
@@ -31,7 +32,7 @@ all: $(EXE)
 -include $(DEPS)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cc
-	@echo "  CC      $*.c"
+	@echo "  CC      $*.cc"
 	@mkdir -p $(dir $@)
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 	$(Q)$(CC) $(CFLAGS) -MT "$@" -MM $< > $(OBJDIR)/$*.d
