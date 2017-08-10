@@ -269,22 +269,6 @@ static inline void BRK(u8 m) {
     PC = Memory::loadw(Memory::IRQ_ADDR);
 }
 
-static inline void NMI() {
-    PUSH(PC_HI);
-    PUSH(PC_LO);
-    PUSH((P & ~0x30) | 0x20);
-    P |= P_I;
-    PC = Memory::loadw(Memory::NMI_ADDR);
-}
-
-static inline void IRQ() {
-    PUSH(PC_HI);
-    PUSH(PC_LO);
-    PUSH((P & ~0x30) | 0x20);
-    P |= P_I;
-    PC = Memory::loadw(Memory::IRQ_ADDR);
-}
-
 static inline void JMP(u16 pc) {
     PC = pc;
 }
@@ -884,6 +868,30 @@ void trace(u8 opcode)
 namespace Eval {
 
 /**
+ * @brief Trigger an NMI (Non Maskable Interrupt).
+ */
+void triggerNMI()
+{
+    PUSH(PC_HI);
+    PUSH(PC_LO);
+    PUSH((P & ~0x30) | 0x20);
+    P |= P_I;
+    PC = Memory::loadw(Memory::NMI_ADDR);
+}
+
+/**
+ * @brief Trigger an IRQ.
+ */
+void triggerIRQ()
+{
+    PUSH(PC_HI);
+    PUSH(PC_LO);
+    PUSH((P & ~0x30) | 0x20);
+    P |= P_I;
+    PC = Memory::loadw(Memory::IRQ_ADDR);
+}
+
+/**
  * @brief Execute a single instruction.
  */
 void runOpcode(u8 opcode)
@@ -896,6 +904,9 @@ void runOpcode(u8 opcode)
         // error("jamming instruction, stopping execution\n");
         // error("  PC $%04x\n", cpu.regs.pc);
         // error("  opcode %02x\n", opcode);
+        std::cerr << "jamming instruction, stopping execution" << std::endl;
+        std::cerr << "  PC $" << (int)currentState->regs.pc << std::endl;
+        std::cerr << "  opcode $" << (int)opcode << std::endl;
         throw "Jamming instruction";
     }
 

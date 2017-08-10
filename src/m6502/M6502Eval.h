@@ -10,6 +10,8 @@ void trace(u8 opcode);
 
 namespace Eval {
 
+void triggerNMI();
+void triggerIRQ();
 void runOpcode(u8 opcode);
 
 };
