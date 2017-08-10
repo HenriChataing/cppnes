@@ -5,11 +5,6 @@
 
 #include "Rom.h"
 
-#define NES_CTRL0_MIRROR_V      (1 << 0)
-#define NES_CTRL0_PRAM          (1 << 1)
-#define NES_CTRL0_TRAILER       (1 << 2)
-#define NES_CTRL0_MIRROR_4SCR   (1 << 3)
-
 /**
  * The iNes file format is organized as follow:
  *  - header: 16 bytes
@@ -48,7 +43,7 @@ Rom::Rom(const char *file)
     u8 *prom = NULL, *crom = NULL, *pram = NULL;
     u8 mapperType;
 
-    n = fread((void *)&header, sizeof(struct header), 1, fd);
+    n = fread((void *)&header, sizeof(struct Header), 1, fd);
     if (n == 0) {
         goto fail;
     }

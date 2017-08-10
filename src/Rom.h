@@ -5,7 +5,12 @@
 #include "Mapper.h"
 #include "type.h"
 
-struct header {
+#define NES_CTRL0_MIRROR_V      (1 << 0)
+#define NES_CTRL0_PRAM          (1 << 1)
+#define NES_CTRL0_TRAILER       (1 << 2)
+#define NES_CTRL0_MIRROR_4SCR   (1 << 3)
+
+struct Header {
     u8 nes[4];    /* Should contain the string 'NES\n'. */
     u8 prom;      /* Number of PRG-ROM banks. */
     u8 crom;      /* Number of CHR-ROM banks. */
@@ -24,7 +29,7 @@ class Rom
         Rom(const char *file);
         ~Rom();
 
-        struct header header;
+        Header header;
         u8 *prgRam;
         u8 *chrRom;
         u8 *prgRom;
