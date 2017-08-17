@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <thread>
+#include <map>
 
 #include <SDL2/SDL.h>
 
@@ -8,10 +9,72 @@
 #include "Joypad.h"
 
 using namespace Joypad;
+using namespace Events;
 
 namespace Events {
 
 static std::thread *currentThread = NULL;
+static std::map<std::pair<int, int>, EventHandler *> keyboardEventHandlers;
+
+class CallbackEventHandler : public EventHandler
+{
+    public:
+        CallbackEventHandler(std::function<void()> &callback)
+            : callback(callback) {}
+        ~CallbackEventHandler() {}
+
+        void operator()(SDL_Event &event) {
+            (void)event;
+            callback();
+        }
+
+        std::function<void()> callback;
+};
+
+class SetterEventHandler : public EventHandler
+{
+    public:
+        SetterEventHandler(bool *ptr) : ptr(ptr) {}
+        ~SetterEventHandler() {}
+
+        void operator()(SDL_Event &event) {
+            *ptr = (event.type == SDL_KEYDOWN);
+        }
+
+        bool *ptr;
+};
+
+static void bindKeyboardEvent(int type, int sym, EventHandler *handler)
+{
+    std::pair<int, int> key(type, sym);
+    EventHandler *oldHandler = keyboardEventHandlers[key];
+    if (oldHandler != NULL && oldHandler != handler)
+        delete oldHandler;
+    keyboardEventHandlers[key] = handler;
+}
+
+/**
+ * @brief Register a callback for the specified keyboard event.
+ * @param callback      event callback
+ */
+void bindKeyboardEvent(int type, int sym, std::function<void()> callback)
+{
+    bindKeyboardEvent(type, sym, new CallbackEventHandler(callback));
+}
+
+/**
+ * @brief Register a callback for the specified keyboard event.
+ *
+ *  The callback will set the status variable
+ *  accordingly (1 key down, 0 key up).
+ *
+ * @param callback      event callback
+ */
+void bindKeyboardEvent(int sym, bool *status)
+{
+    bindKeyboardEvent(SDL_KEYUP, sym, new SetterEventHandler(status));
+    bindKeyboardEvent(SDL_KEYDOWN, sym, new SetterEventHandler(status));
+}
 
 /**
  * @brief Wait for (and handle) SDL keyboard events.
@@ -31,72 +94,23 @@ static void handleEvents()
         }
 
         switch (event.type) {
-            case SDL_KEYUP:
-                switch (event.key.keysym.sym) {
-                    /* Joypad controls. */
-                    case SDLK_w:
-                        currentJoypad->buttonUp(JOYPAD_BUTTON_A);
-                        break;
-                    case SDLK_x:
-                        currentJoypad->buttonUp(JOYPAD_BUTTON_B);
-                        break;
-                    case SDLK_SPACE:
-                        currentJoypad->buttonUp(JOYPAD_BUTTON_SELECT);
-                        break;
-                    case SDLK_RETURN:
-                        currentJoypad->buttonUp(JOYPAD_BUTTON_START);
-                        break;
-                    case SDLK_UP:
-                        currentJoypad->buttonUp(JOYPAD_BUTTON_UP);
-                        break;
-                    case SDLK_DOWN:
-                        currentJoypad->buttonUp(JOYPAD_BUTTON_DOWN);
-                        break;
-                    case SDLK_LEFT:
-                        currentJoypad->buttonUp(JOYPAD_BUTTON_LEFT);
-                        break;
-                    case SDLK_RIGHT:
-                        currentJoypad->buttonUp(JOYPAD_BUTTON_RIGHT);
-                        break;
-                    default:
-                        break;
-                }
+            case SDL_KEYUP: {
+                std::pair<int, int> key(SDL_KEYUP, event.key.keysym.sym);
+                EventHandler *handler = keyboardEventHandlers[key];
+                if (handler != NULL)
+                    (*handler)(event);
                 break;
-            case SDL_KEYDOWN:
+            }
+            case SDL_KEYDOWN: {
                 if (event.key.repeat != 0)
                     break;
-                switch (event.key.keysym.sym) {
-                    /* Joypad controls. */
-                    case SDLK_w:
-                        currentJoypad->buttonDown(JOYPAD_BUTTON_A);
-                        break;
-                    case SDLK_x:
-                        currentJoypad->buttonDown(JOYPAD_BUTTON_B);
-                        break;
-                    case SDLK_SPACE:
-                        currentJoypad->buttonDown(JOYPAD_BUTTON_SELECT);
-                        break;
-                    case SDLK_RETURN:
-                        currentJoypad->buttonDown(JOYPAD_BUTTON_START);
-                        break;
-                    case SDLK_UP:
-                        currentJoypad->buttonDown(JOYPAD_BUTTON_UP);
-                        break;
-                    case SDLK_DOWN:
-                        currentJoypad->buttonDown(JOYPAD_BUTTON_DOWN);
-                        break;
-                    case SDLK_LEFT:
-                        currentJoypad->buttonDown(JOYPAD_BUTTON_LEFT);
-                        break;
-                    case SDLK_RIGHT:
-                        currentJoypad->buttonDown(JOYPAD_BUTTON_RIGHT);
-                        break;
-                    default:
-                        break;
-                }
-                break;
+                std::pair<int, int> key(SDL_KEYDOWN, event.key.keysym.sym);
+                EventHandler *handler = keyboardEventHandlers[key];
+                if (handler != NULL)
+                    (*handler)(event);
+            }
             case SDL_QUIT:
-                std::cerr << "SDL QUIT" << std::endl;
+                std::cerr << "Quitting..." << std::endl;
                 return;
             default:
                 break;

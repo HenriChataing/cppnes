@@ -11,6 +11,20 @@
 
 using namespace M6502;
 
+/**
+ * TODO list
+ *  - track which flags are tested in an instruction block, and pass on that
+ *      information to the instruction compilers, to save restoreStatusFlags
+ *      and testZeroSign calls
+ *  - analyse the address of load and store absolute instructions,
+ *      and implement the operation accordingly
+ *  - test if branch targets do fall in the current PRG-ROM bank
+ *  - compile absolute jumps
+ *  - compile indirect jumps
+ *  - study the possiblity of using actual PUSH instructions to implement
+ *      6502 stack operations
+ */
+
 InstructionCache::InstructionCache()
     : _asmEmitter(0x100000)
 {

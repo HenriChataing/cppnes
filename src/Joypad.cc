@@ -1,8 +1,10 @@
 #include <cstdlib>
 #include <iostream>
+#include <functional>
 #include <string.h>
 
 #include "Joypad.h"
+#include "Events.h"
 
 using namespace Joypad;
 
@@ -11,6 +13,39 @@ namespace Joypad {
 Joypad::Joypad() : strobe(false), reads(0)
 {
     memset(buttons, 0, sizeof(buttons));
+
+    Events::bindKeyboardEvent(SDL_KEYDOWN, SDLK_w,
+        std::bind(&Joypad::buttonDown, this, JOYPAD_BUTTON_A));
+    Events::bindKeyboardEvent(SDL_KEYUP, SDLK_w,
+        std::bind(&Joypad::buttonUp, this, JOYPAD_BUTTON_A));
+    Events::bindKeyboardEvent(SDL_KEYDOWN, SDLK_x,
+        std::bind(&Joypad::buttonDown, this, JOYPAD_BUTTON_B));
+    Events::bindKeyboardEvent(SDL_KEYUP, SDLK_x,
+        std::bind(&Joypad::buttonUp, this, JOYPAD_BUTTON_B));
+    Events::bindKeyboardEvent(SDL_KEYDOWN, SDLK_SPACE,
+        std::bind(&Joypad::buttonDown, this, JOYPAD_BUTTON_SELECT));
+    Events::bindKeyboardEvent(SDL_KEYUP, SDLK_SPACE,
+        std::bind(&Joypad::buttonUp, this, JOYPAD_BUTTON_SELECT));
+    Events::bindKeyboardEvent(SDL_KEYDOWN, SDLK_RETURN,
+        std::bind(&Joypad::buttonDown, this, JOYPAD_BUTTON_START));
+    Events::bindKeyboardEvent(SDL_KEYUP, SDLK_RETURN,
+        std::bind(&Joypad::buttonUp, this, JOYPAD_BUTTON_START));
+    Events::bindKeyboardEvent(SDL_KEYDOWN, SDLK_UP,
+        std::bind(&Joypad::buttonDown, this, JOYPAD_BUTTON_UP));
+    Events::bindKeyboardEvent(SDL_KEYUP, SDLK_UP,
+        std::bind(&Joypad::buttonUp, this, JOYPAD_BUTTON_UP));
+    Events::bindKeyboardEvent(SDL_KEYDOWN, SDLK_DOWN,
+        std::bind(&Joypad::buttonDown, this, JOYPAD_BUTTON_DOWN));
+    Events::bindKeyboardEvent(SDL_KEYUP, SDLK_DOWN,
+        std::bind(&Joypad::buttonUp, this, JOYPAD_BUTTON_DOWN));
+    Events::bindKeyboardEvent(SDL_KEYDOWN, SDLK_LEFT,
+        std::bind(&Joypad::buttonDown, this, JOYPAD_BUTTON_LEFT));
+    Events::bindKeyboardEvent(SDL_KEYUP, SDLK_LEFT,
+        std::bind(&Joypad::buttonUp, this, JOYPAD_BUTTON_LEFT));
+    Events::bindKeyboardEvent(SDL_KEYDOWN, SDLK_RIGHT,
+        std::bind(&Joypad::buttonDown, this, JOYPAD_BUTTON_RIGHT));
+    Events::bindKeyboardEvent(SDL_KEYUP, SDLK_RIGHT,
+        std::bind(&Joypad::buttonUp, this, JOYPAD_BUTTON_RIGHT));
 }
 
 Joypad::~Joypad()

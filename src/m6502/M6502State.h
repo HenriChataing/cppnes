@@ -41,7 +41,7 @@ class State
         bool irq;
 };
 
-extern class State *currentState;
+extern State *currentState;
 
 };
 
