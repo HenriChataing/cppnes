@@ -4,6 +4,7 @@
 #include "Memory.h"
 #include "Mapper.h"
 #include "N2C02State.h"
+#include "M6502State.h"
 #include "Joypad.h"
 
 using namespace Memory;
@@ -37,6 +38,11 @@ u8 *chrRom;
 bool prgRamEnabled;
 bool prgRamWriteProtected;
 u8 prgRam[0x2000];
+
+/**
+ * Initiate a DMA tranfer with the 2C02 PPU memory.
+ */
+static void writeOAMDMARegister(u8 val);
 
 /**
  * @brief Load a byte from an address in the CPU memory address space.
@@ -100,8 +106,7 @@ void store(u16 addr, u8 val)
         Joypad::currentJoypad->writeRegister(val);
     else
     if (addr == OAMDMA_ADDR)
-        // writeOAMDMARegister(val);
-        return;
+        writeOAMDMARegister(val);
     else
     if (addr < 0x4020)
         // writeAPURegister(addr, val);
@@ -112,6 +117,16 @@ void store(u16 addr, u8 val)
     else
     if (prgRamEnabled && !prgRamWriteProtected)
         prgRam[addr & 0x1fff] = val;
+}
+
+static inline void writeOAMDMARegister(u8 val)
+{
+    u16 dmaoffset, dmapage = (u16)val << 8;
+    for (dmaoffset = 0; dmaoffset < 0x100; dmaoffset++) {
+        val = load(dmapage + dmaoffset);
+        N2C02::currentState->dmaTransfer(val);
+    }
+    M6502::currentState->cycles += 514; /* Technically 513 OR 514. */
 }
 
 };
