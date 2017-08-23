@@ -877,6 +877,8 @@ void triggerNMI()
     PUSH((P & ~0x30) | 0x20);
     P |= P_I;
     PC = Memory::loadw(Memory::NMI_ADDR);
+    currentState->cycles += Asm::instructions[BRK_IMP].cycles;
+    currentState->nmi = false;
 }
 
 /**
@@ -884,11 +886,14 @@ void triggerNMI()
  */
 void triggerIRQ()
 {
+    /// FIXME check if I status bit set
     PUSH(PC_HI);
     PUSH(PC_LO);
     PUSH((P & ~0x30) | 0x20);
     P |= P_I;
     PC = Memory::loadw(Memory::IRQ_ADDR);
+    currentState->cycles += Asm::instructions[BRK_IMP].cycles;
+    currentState->irq = false;
 }
 
 /**

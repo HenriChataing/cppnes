@@ -32,7 +32,6 @@ void emulate()
             /* Catch interrupts */
             if (M6502::currentState->nmi) {
                 M6502::Eval::triggerNMI();
-                M6502::currentState->nmi = false;
             }
             /* Evaluate next instruction */
             u8 opcode = Memory::load(M6502::currentState->regs.pc);
