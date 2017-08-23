@@ -21,6 +21,7 @@ void bindKeyboardEvent(int type, int sym, std::function<void()> callback);
 void bindKeyboardEvent(int sym, bool *status);
 
 void init();
+bool isQuit();
 
 };
 

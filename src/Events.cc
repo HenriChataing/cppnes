@@ -15,6 +15,7 @@ namespace Events {
 
 static std::thread *currentThread = NULL;
 static std::map<std::pair<int, int>, EventHandler *> keyboardEventHandlers;
+static bool quitEvent = false;
 
 class CallbackEventHandler : public EventHandler
 {
@@ -108,9 +109,11 @@ static void handleEvents()
                 EventHandler *handler = keyboardEventHandlers[key];
                 if (handler != NULL)
                     (*handler)(event);
+                break;
             }
             case SDL_QUIT:
                 std::cerr << "Quitting..." << std::endl;
+                quitEvent = true;
                 return;
             default:
                 break;
@@ -125,6 +128,15 @@ void init()
 {
     if (currentThread == NULL)
         currentThread = new std::thread(handleEvents);
+    quitEvent = false;
+}
+
+/**
+ * @brief Check whether the quit event was raised.
+ */
+bool isQuit()
+{
+    return quitEvent;
 }
 
 };
