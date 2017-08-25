@@ -1141,7 +1141,6 @@ next:
 static void drawPatternTables(int sx, int sy)
 {
     uint32_t greyscale[4] = { 0xffffff, 0x404040, 0x808080, 0x0 };
-    // uint32_t greyscale[4] = { 0xd8d8d8, 0xcc9e70, 0xcb733c, 0x712010 };
     u16 addr, line;
     int hpos = 0, vpos = 0, col;
 
@@ -1158,13 +1157,7 @@ static void drawPatternTables(int sx, int sy)
                     (((hi >> col) << 1) & 0x2);
                 int x = 8 * hpos + 7 - col;
                 int y = 8 * vpos + line;
-                x = sx + 2 * x;
-                y = (sy + 2 * y) * SCREEN_WIDTH;
-                int z = x + sy + y;
-                pixels[z] = greyscale[p];
-                pixels[z + 1] = greyscale[p];
-                pixels[z + SCREEN_WIDTH] = greyscale[p];
-                pixels[z + SCREEN_WIDTH + 1] = greyscale[p];
+                pixels[(sy + y) * SCREEN_WIDTH + sx + x] = greyscale[p];
             }
         }
         if (hpos >= PPU_HBLOCKS - 1) {
