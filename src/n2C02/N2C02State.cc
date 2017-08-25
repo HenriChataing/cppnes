@@ -1054,12 +1054,21 @@ void dot(void)
             // prerenderBackground();
             if (currentState->mask.br)
                 flushScreen();
-#ifdef PPU_DEBUG
-            /* Display the frame rate. */
-#endif
+#ifndef PPU_MAX_FPS
             /* Adjust the frame rate. */
             fps.wait(N2C02_FRAME_MS);
             fps.reset();
+#else
+            /* Display the frame rate. */
+            /// FIXME print text in debug window.
+            static unsigned int frames = 0;
+            frames++;
+            if (fps.get() > 1000) {
+                std::cout << "FPS:" << frames << std::endl;
+                fps.reset();
+                frames = 0;
+            }
+#endif
         }
     }
     /* Rendering is disabled. */
