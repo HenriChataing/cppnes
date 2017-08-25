@@ -78,7 +78,10 @@ using namespace N2C02;
 #define VBLANK      (currentState->scanline > 240)
 
 /**
- * Interleave the bits of two byte values.
+ * @brief Interleave the bits of two byte values.
+ * @param b0    first byte
+ * @param b1    second byte
+ * @return      the short value with the bits `b1[7]b0[7] ... b0[0]`
  */
 static u16 interleave(u8 b0, u8 b1);
 
@@ -145,26 +148,6 @@ extern const u32 colors[64];
 namespace N2C02 {
 
 State *currentState;
-
-/** Do draw the pattern table. */
-bool displayPatternTables = false;
-
-/** Do draw the name tables. */
-bool displayNameTables = false;
-int displayNameTablesSel = 0;
-
-/** Do draw the name tables. */
-bool displayAttrTables = false;
-int displayAttrTablesSel = 0;
-
-/** Do draw the palettes. */
-bool displayPalettes = false;
-
-/** Do draw the visible sprites. */
-bool displaySprites = false;
-
-/** Prevent the PPU from flushing the window. */
-bool freezeScreen = false;
 
 static u8 load(u16 addr);
 static void store(u16 addr, u8 val);
@@ -557,8 +540,7 @@ static inline void drawPixel(int x, int y, uint32_t c)
  */
 static inline void flushScreen(void)
 {
-    if (!freezeScreen)
-        SDL_UpdateWindowSurface(window);
+    SDL_UpdateWindowSurface(window);
 }
 
 /**
@@ -1070,8 +1052,6 @@ void dot(void)
             SDL_UpdateWindowSurface(window);
 #endif
             // prerenderBackground();
-            if (displaySprites)
-                drawSprites();
             if (currentState->mask.br)
                 flushScreen();
 #ifdef PPU_DEBUG

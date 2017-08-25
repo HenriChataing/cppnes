@@ -154,15 +154,6 @@ public:
 
 extern State *currentState;
 
-extern bool displayPatternTables;
-extern bool displayNameTables;
-extern int displayNameTablesSel;
-extern bool displayAttrTables;
-extern int displayAttrTablesSel;
-extern bool displayPalettes;
-extern bool displaySprites;
-extern bool freezeScreen;
-
 void setVerticalMirroring(void);
 void setHorizontalMirroring(void);
 void set1ScreenMirroring(int upper);
