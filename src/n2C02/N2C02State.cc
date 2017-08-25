@@ -8,8 +8,12 @@
 #include "M6502State.h"
 #include "Memory.h"
 #include "Rom.h"
+#include "Timer.h"
 
 using namespace N2C02;
+
+#define N2C02_FRAME_RATE    (60.10f)
+#define N2C02_FRAME_MS      ((unsigned long)(1000.f / N2C02_FRAME_RATE))
 
 #define PPU_VBLOCKS     30
 #define PPU_HBLOCKS     32
@@ -66,9 +70,12 @@ using namespace N2C02;
 #define RENDERON    (currentState->mask.br || currentState->mask.sr)
 #define VBLANK      (currentState->scanline > 240)
 
+/**
+ * Interleave the bits of two byte values.
+ */
 static u16 interleave(u8 b0, u8 b1);
 
-/** 4-u8 sprite definition. */
+/** 4-byte sprite definition. */
 struct sprite {
     union {
         struct {
@@ -88,6 +95,7 @@ static void (*scanlineCallback)(int, int);
 static SDL_Window *window;
 static SDL_Surface *screen;
 static uint32_t *pixels;
+static Timer fps;
 
 /** SPR-RAM to store sprite attributes. */
 static union {
@@ -1064,6 +1072,9 @@ void dot(void)
                 drawSprites();
             if (currentState->mask.br)
                 flushScreen();
+            /* Adjust the frame rate. */
+            fps.wait(N2C02_FRAME_MS);
+            fps.reset();
         }
     }
     /* Rendering is disabled. */
