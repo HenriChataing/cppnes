@@ -12,14 +12,21 @@
 
 using namespace N2C02;
 
-#define N2C02_FRAME_RATE    (60.10f)
-#define N2C02_FRAME_MS      ((unsigned long)(1000.f / N2C02_FRAME_RATE))
+#define N2C02_FRAME_RATE        (60.10f)
+#define N2C02_FRAME_MS          ((unsigned long)(1000.f / N2C02_FRAME_RATE))
 
-#define PPU_VBLOCKS     30
-#define PPU_HBLOCKS     32
-#define PPU_PIXEL_SIZE  2
-#define PPU_SCREEN_WIDTH  (PPU_HBLOCKS * 8 * PPU_PIXEL_SIZE)
-#define PPU_SCREEN_HEIGHT (PPU_VBLOCKS * 8 * PPU_PIXEL_SIZE)
+#define PPU_VBLOCKS             (30)
+#define PPU_HBLOCKS             (32)
+#define PPU_WIDTH               (PPU_HBLOCKS * 8)
+#define PPU_HEIGHT              (PPU_VBLOCKS * 8)
+
+#ifndef PPU_DEBUG
+#define SCREEN_WIDTH            (PPU_WIDTH * 2)
+#define SCREEN_HEIGHT           (PPU_HEIGHT * 2)
+#else
+#define SCREEN_WIDTH            (PPU_WIDTH * 4)
+#define SCREEN_HEIGHT           (PPU_HEIGHT * 2)
+#endif
 
 #define VADDR_COARSE_X_MASK     (0x1f << 0)
 #define VADDR_COARSE_X_MAX      (0x1f << 0)
@@ -362,7 +369,7 @@ int init()
 
     window = SDL_CreateWindow("cnes 0.1",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        PPU_SCREEN_WIDTH, PPU_SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+        SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
     if (!window) {
         std::cerr << "failed to create SDL window: " << SDL_GetError();
         std::cerr << std::endl;
@@ -384,7 +391,7 @@ int init()
     }
     /* Paint it blaaack. */
     pixels = (uint32_t *)screen->pixels;
-    memset(pixels, 0, 4 * PPU_SCREEN_WIDTH * PPU_SCREEN_HEIGHT);
+    memset(pixels, 0, 4 * SCREEN_WIDTH * SCREEN_HEIGHT);
     SDL_UpdateWindowSurface(window);
 
     /* Setup name table mirroring. */
@@ -536,15 +543,13 @@ static inline void drawPixel(int x, int y, uint32_t c)
         x >= 8 * PPU_HBLOCKS ||
         y >= 8 * PPU_VBLOCKS)
         return;
-    x *= PPU_PIXEL_SIZE;
-    y *= PPU_PIXEL_SIZE * PPU_SCREEN_WIDTH;
+    x *= 2;
+    y *= 2 * SCREEN_WIDTH;
     int z = x + y;
     pixels[z] = c;
-#if PPU_PIXEL_SIZE == 2
     pixels[z + 1] = c;
-    pixels[z + PPU_SCREEN_WIDTH] = c;
-    pixels[z + PPU_SCREEN_WIDTH + 1] = c;
-#endif
+    pixels[z + SCREEN_WIDTH] = c;
+    pixels[z + SCREEN_WIDTH + 1] = c;
 }
 
 /**
@@ -981,10 +986,10 @@ static void prerenderSprites(void)
 }
 #endif
 
-static void drawPatternTables(void);
-static void drawNameTables(int sel);
-static void drawAttrTables(int sel);
-static void drawPalettes(void);
+static void drawPatternTables(int sx, int sy);
+static void drawNameTable(int sx, int sy, int sel);
+static void drawAttrTable(int sx, int sy, int sel);
+static void drawPalettes(int sx, int sy);
 static void drawSprites(void);
 
 /**
@@ -1056,22 +1061,22 @@ void dot(void)
         if (currentState->scanline == 241 && currentState->cycle == 1) {
             currentState->status |= PPUSTATUS_V;
             M6502::currentState->nmi = currentState->ctrl.v;
-            if (displayPatternTables) {
-                drawPatternTables();
-            }
-            if (displayNameTables) {
-                drawNameTables(displayNameTablesSel);
-            }
-            if (displayAttrTables) {
-                prerenderBackground();
-                // drawAttrTables(displayAttrTablesSel);
-            }
-            if (displayPalettes)
-                drawPalettes();
+#ifdef PPU_DEBUG
+            drawPalettes(0, 0);
+            drawNameTable(PPU_WIDTH, 0, 0);
+            drawNameTable(PPU_WIDTH, PPU_HEIGHT, 1);
+            drawAttrTable(PPU_WIDTH / 2, PPU_HEIGHT, 0);
+            drawAttrTable(PPU_WIDTH / 2, PPU_HEIGHT + PPU_HEIGHT / 2, 1);
+            SDL_UpdateWindowSurface(window);
+#endif
+            // prerenderBackground();
             if (displaySprites)
                 drawSprites();
             if (currentState->mask.br)
                 flushScreen();
+#ifdef PPU_DEBUG
+            /* Display the frame rate. */
+#endif
             /* Adjust the frame rate. */
             fps.wait(N2C02_FRAME_MS);
             fps.reset();
@@ -1150,15 +1155,18 @@ next:
     }
 }
 
-
 /**
  * @brief Draw the patterns tables.
  */
-static void drawPatternTables(void)
+static void drawPatternTables(int sx, int sy)
 {
     uint32_t greyscale[4] = { 0xffffff, 0x404040, 0x808080, 0x0 };
+    // uint32_t greyscale[4] = { 0xd8d8d8, 0xcc9e70, 0xcb733c, 0x712010 };
     u16 addr, line;
     int hpos = 0, vpos = 0, col;
+
+    /* sx, sy refer to coordinates in the debug screen. */
+    sx += 2 * PPU_WIDTH;
 
     for (addr = 0x0000; addr < 0x2000; addr += 16) {
         for (line = 0; line < 8; line++) {
@@ -1168,7 +1176,15 @@ static void drawPatternTables(void)
                 int p =
                     ((lo >> col) & 0x1) |
                     (((hi >> col) << 1) & 0x2);
-                drawPixel(8 * hpos + 7 - col, 8 * vpos + line, greyscale[p]);
+                int x = 8 * hpos + 7 - col;
+                int y = 8 * vpos + line;
+                x = sx + 2 * x;
+                y = (sy + 2 * y) * SCREEN_WIDTH;
+                int z = x + sy + y;
+                pixels[z] = greyscale[p];
+                pixels[z + 1] = greyscale[p];
+                pixels[z + SCREEN_WIDTH] = greyscale[p];
+                pixels[z + SCREEN_WIDTH + 1] = greyscale[p];
             }
         }
         if (hpos >= PPU_HBLOCKS - 1) {
@@ -1177,21 +1193,21 @@ static void drawPatternTables(void)
         } else
             hpos++;
     }
-
-    SDL_UpdateWindowSurface(window);
 }
 
 /**
  * @brief Draw the nth name table.
  * @param sel indicate which name table to draw
  */
-static void drawNameTables(int sel)
+static void drawNameTable(int sx, int sy, int sel)
 {
     const uint32_t greyscale[4] = { 0xffffff, 0x404040, 0x808080, 0x0 };
     const u8 *ntable = ntables[sel % 4];
     const u16 ptable = currentState->ctrl.b;
-
     int hpos = 0, vpos = 0;
+
+    /* sx, sy refer to coordinates in the debug screen. */
+    sx += 2 * PPU_WIDTH;
 
     for (u16 addr = 0x0; addr < 0x3c0; addr++) {
         u8 nt = ntable[addr];
@@ -1202,7 +1218,9 @@ static void drawNameTables(int sel)
                 int p =
                     ((lo >> col) & 0x1) |
                     (((hi >> col) << 1) & 0x2);
-                drawPixel(8 * hpos + 7 - col, 8 * vpos + line, greyscale[p]);
+                int x = 8 * hpos + 7 - col;
+                int y = 8 * vpos + line;
+                pixels[SCREEN_WIDTH * (y + sy) + x + sx] = greyscale[p];
             }
         }
         if (hpos >= PPU_HBLOCKS - 1) {
@@ -1211,23 +1229,21 @@ static void drawNameTables(int sel)
         } else
             hpos++;
     }
-
-    SDL_UpdateWindowSurface(window);
 }
 
 /**
  * @brief Draw a tile displaying the configured palette colors.
- * @param col x offset
- * @param line y offset
- * @param pa selected palette
+ * @param sx    x offset
+ * @param sy    y offset
+ * @param c     selected color palette
  */
-static void _drawPaletteTile(int col, int line, uint32_t c[4])
+static void _drawPaletteTile(int sx, int sy, uint32_t c[4])
 {
     int x, y;
     for (x = 0; x < 8; x ++)
         for (y = 0; y < 8; y ++) {
             int sel = (y / 4) * 2 + x / 4;
-            drawPixel(col + x, line + y, c[sel]);
+            pixels[SCREEN_WIDTH * (sy + y) + sx + x] = c[sel];
         }
 }
 
@@ -1235,7 +1251,7 @@ static void _drawPaletteTile(int col, int line, uint32_t c[4])
  * @brief Draw the attribute tables.
  * @param sel indicate which attribute table to draw
  */
-static void drawAttrTables(int sel)
+static void drawAttrTable(int sx, int sy, int sel)
 {
     const u16 attrtables[4] = { 0x23c0, 0x27c0, 0x2bc0, 0x2fc0 };
     uint32_t c[4];
@@ -1245,6 +1261,9 @@ static void drawAttrTables(int sel)
 
     startaddr = attrtables[sel % 4];
     endaddr = startaddr + 0x0040;
+
+    /* sx, sy refer to coordinates in the debug screen. */
+    sx += 2 * PPU_WIDTH;
 
     /*
      * The palette contains 4 different backgroud palettes, selected by two bits
@@ -1276,11 +1295,9 @@ static void drawAttrTables(int sel)
                 c[3] = colors[load(pa + 3)];
                 at >>= 2;
                 /* Draw the palette for one tile. */
-                _drawPaletteTile((hpos + bhpos) * 8, (vpos + bvpos) * 8, c);
-                _drawPaletteTile((hpos + bhpos + 1) * 8, (vpos + bvpos) * 8, c);
-                _drawPaletteTile((hpos + bhpos) * 8, (vpos + bvpos + 1) * 8, c);
                 _drawPaletteTile(
-                    (hpos + bhpos + 1) * 8, (vpos + bvpos + 1) * 8, c);
+                    sx + (hpos + bhpos) * 4,
+                    sy + (vpos + bvpos) * 4, c);
             }
         }
         if (hpos >= PPU_HBLOCKS - 4) {
@@ -1296,16 +1313,22 @@ static void drawAttrTables(int sel)
 /**
  * @brief Draw the palettes.
  */
-static void drawPalettes(void)
+static void drawPalettes(int sx, int sy)
 {
     u16 addr, line;
     int hpos = 0, vpos = 0, col;
 
+    /* sx, sy refer to coordinates in the debug screen. */
+    sx += 2 * PPU_WIDTH;
+
     for (addr = 0x3f00; addr < 0x3f20; addr++) {
         u8 c = load(addr);
         for (line = 0; line < 8; line++) {
-            for (col = 0; col < 8; col++)
-                drawPixel(8 * hpos + col, 8 * vpos + line, colors[c]);
+            for (col = 0; col < 8; col++) {
+                int x = 8 * hpos + col;
+                int y = 8 * vpos + line;
+                pixels[sx + x + (sy + y) * SCREEN_WIDTH] = colors[c];
+            }
         }
         if (hpos >= PPU_HBLOCKS - 1) {
             hpos = 0;
@@ -1329,7 +1352,7 @@ static void drawSprites(void)
 
     /* Clear the screen using the universal background color. */
     u8 c = load(0x3f00);
-    for (int i = 0; i < PPU_SCREEN_WIDTH * PPU_SCREEN_HEIGHT; i++)
+    for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++)
         pixels[i] = colors[c];
 
     /* Draw some sprites (backward iteration to respect priority). */
