@@ -1,5 +1,6 @@
 
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 
 #include "Rom.h"
@@ -9,7 +10,7 @@
 class NROM: public Mapper
 {
     public:
-        NROM(Rom *rom) : Mapper("NROM") {
+        NROM(Rom *rom) : Mapper(rom, "NROM") {
             Memory::prgBankSize = 0x4000;
             Memory::prgBankMask = 0x3fff;
             Memory::prgBankShift = 14;
@@ -31,7 +32,7 @@ class NROM: public Mapper
                 Memory::prgBank[0] = rom->prgRom;
                 Memory::prgBank[1] = rom->prgRom;
             }
-            Memory::chrRom = rom->chrRom;
+            memcpy(Memory::chrRom, rom->chrRom, 0x2000);
         }
 
         ~NROM() {
@@ -43,7 +44,7 @@ class NROM: public Mapper
 
         void storeChr(u16 addr, u8 val) {
             if (_chrRam)
-                currentRom->chrRom[addr] = val;
+                rom->chrRom[addr] = val;
         }
 
     private:

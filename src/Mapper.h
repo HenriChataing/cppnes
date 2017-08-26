@@ -17,10 +17,11 @@ class Mapper
         virtual void storePrg(u16 addr, u8 val) = 0;
         virtual void storeChr(u16 addr, u8 val) = 0;
 
+        Rom *rom;
         const std::string name;
 
     protected:
-        Mapper(const std::string name) : name(name) { }
+        Mapper(Rom *rom, const std::string name) : rom(rom), name(name) { }
 };
 
 typedef Mapper* (*MapperConstructor)(Rom *rom);

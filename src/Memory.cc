@@ -30,7 +30,7 @@ u8 *prgBank[4];
 /**
  * CHR rom, addresses 0x0000-0x1fff of the PPU address space
  */
-u8 *chrRom;
+u8 chrRom[0x2000];
 
 /**
  * PRG ram, addresses 0x6000-0x7fff

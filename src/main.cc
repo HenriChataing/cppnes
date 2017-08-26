@@ -11,13 +11,17 @@
 
 int main(int argc, char *argv[])
 {
-    currentRom = new Rom(argv[1]);
-    M6502::currentState = new M6502::State();
-    N2C02::currentState = new N2C02::State();
-    Joypad::currentJoypad = new Joypad::Joypad();
-    N2C02::init();
-    Events::init();
-    Core::emulate();
-    N2C02::quit();
+    try {
+        currentRom = new Rom(argv[1]);
+        M6502::currentState = new M6502::State();
+        N2C02::currentState = new N2C02::State();
+        Joypad::currentJoypad = new Joypad::Joypad();
+        N2C02::init();
+        Events::init();
+        Core::emulate();
+        N2C02::quit();
+    } catch (const char *str) {
+        std::cerr << "Fatal error (main): " << str << std::endl;
+    }
     return 0;
 }

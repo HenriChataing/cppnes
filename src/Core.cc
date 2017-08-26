@@ -23,8 +23,6 @@ void emulate()
 {
     M6502::currentState->clear();
     M6502::currentState->reset();
-    /// FIXME remove this line !
-    // M6502::currentState->regs.pc = 0xc000;
 
     try {
         while (true) {
@@ -43,12 +41,12 @@ void emulate()
                 N2C02::dot();
                 cycles--;
             }
-            /// TODO see if possible to check less often
             if (Events::isQuit())
                 break;
         }
     } catch (char const * s) {
-        std::cerr << "Fatal error: " << s << std::endl;
+        std::cerr << "Fatal error (core): " << s << std::endl;
+        Events::quit();
     }
 }
 

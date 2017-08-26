@@ -89,6 +89,8 @@ static void handleEvents()
     {
         int ret = SDL_WaitEvent(&event);
         if (ret == 0) {
+            if (isQuit())
+                return;
             std::cerr << "Error waiting for SDL events (";
             std::cerr << SDL_GetError() << ")" << std::endl;
             continue;
@@ -113,7 +115,7 @@ static void handleEvents()
             }
             case SDL_QUIT:
                 std::cerr << "Quitting..." << std::endl;
-                quitEvent = true;
+                quit();
                 return;
             default:
                 break;
@@ -129,6 +131,14 @@ void init()
     if (currentThread == NULL)
         currentThread = new std::thread(handleEvents);
     quitEvent = false;
+}
+
+/**
+ * @brief Indicate an quit condition in one of thr threads was raised.
+ */
+void quit()
+{
+    quitEvent = true;
 }
 
 /**

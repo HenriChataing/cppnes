@@ -26,7 +26,7 @@ extern u8 *prgBank[];
 /**
  * CHR rom, addresses 0x0000-0x1fff of the PPU address space
  */
-extern u8 *chrRom;
+extern u8 chrRom[];
 
 /**
  * PRG ram, addresses 0x6000-0x7fff
