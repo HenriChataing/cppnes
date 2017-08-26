@@ -19,30 +19,30 @@ static bool quitEvent = false;
 
 class CallbackEventHandler : public EventHandler
 {
-    public:
-        CallbackEventHandler(std::function<void()> &callback)
-            : callback(callback) {}
-        ~CallbackEventHandler() {}
+public:
+    CallbackEventHandler(std::function<void()> &callback)
+        : callback(callback) {}
+    ~CallbackEventHandler() {}
 
-        void operator()(SDL_Event &event) {
-            (void)event;
-            callback();
-        }
+    void operator()(SDL_Event &event) {
+        (void)event;
+        callback();
+    }
 
-        std::function<void()> callback;
+    std::function<void()> callback;
 };
 
 class SetterEventHandler : public EventHandler
 {
-    public:
-        SetterEventHandler(bool *ptr) : ptr(ptr) {}
-        ~SetterEventHandler() {}
+public:
+    SetterEventHandler(bool *ptr) : ptr(ptr) {}
+    ~SetterEventHandler() {}
 
-        void operator()(SDL_Event &event) {
-            *ptr = (event.type == SDL_KEYDOWN);
-        }
+    void operator()(SDL_Event &event) {
+        *ptr = (event.type == SDL_KEYDOWN);
+    }
 
-        bool *ptr;
+    bool *ptr;
 };
 
 static void bindKeyboardEvent(int type, int sym, EventHandler *handler)

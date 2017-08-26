@@ -11,10 +11,10 @@ namespace Events {
 
 class EventHandler
 {
-    public:
-        EventHandler() {};
-        virtual ~EventHandler() {};
-        virtual void operator()(SDL_Event &event) {};
+public:
+    EventHandler() {};
+    virtual ~EventHandler() {};
+    virtual void operator()(SDL_Event &event) {};
 };
 
 void bindKeyboardEvent(int type, int sym, std::function<void()> callback);

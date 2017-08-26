@@ -20,19 +20,19 @@ enum JoypadButton {
 /* Current state (such as pressed buttons). */
 class Joypad
 {
-    public:
-        Joypad();
-        ~Joypad();
+public:
+    Joypad();
+    ~Joypad();
 
-        u8 readRegister();
-        void writeRegister(u8 val);
-        void buttonUp(JoypadButton button);
-        void buttonDown(JoypadButton button);
+    u8 readRegister();
+    void writeRegister(u8 val);
+    void buttonUp(JoypadButton button);
+    void buttonDown(JoypadButton button);
 
-        /** Joypad status registers. */
-        bool buttons[JOYPAD_BUTTON_COUNT];
-        bool strobe;
-        unsigned int reads;
+    /** Joypad status registers. */
+    bool buttons[JOYPAD_BUTTON_COUNT];
+    bool strobe;
+    unsigned int reads;
 };
 
 extern Joypad *currentJoypad;

@@ -18,27 +18,27 @@ struct Registers
 
 class State
 {
-    public:
-        State();
-        ~State();
+public:
+    State();
+    ~State();
 
-        void clear();
-        void reset();
+    void clear();
+    void reset();
 
-        /** CPU registers. */
-        Registers regs;
+    /** CPU registers. */
+    Registers regs;
 
-        /** Stack pointer (equal to Memory::ram + 0x100 + SP) */
-        u8 *stack;
+    /** Stack pointer (equal to Memory::ram + 0x100 + SP) */
+    u8 *stack;
 
-        /** Cycle count. */
-        ulong cycles;
+    /** Cycle count. */
+    ulong cycles;
 
-        /** Set to true if an NMI is pending. */
-        bool nmi;
+    /** Set to true if an NMI is pending. */
+    bool nmi;
 
-        /** Set to true if an IRQ is pending. */
-        bool irq;
+    /** Set to true if an IRQ is pending. */
+    bool irq;
 };
 
 extern State *currentState;

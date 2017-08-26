@@ -21,18 +21,18 @@ struct Header {
 
 class Rom
 {
-    public:
-        /**
-         * Load a game cartridge from the provided path.
-         * @param file          path to the nes cartridge file
-         */
-        Rom(const char *file);
-        ~Rom();
+public:
+    /**
+     * Load a game cartridge from the provided path.
+     * @param file          path to the nes cartridge file
+     */
+    Rom(const char *file);
+    ~Rom();
 
-        Header header;
-        u8 *prgRam;
-        u8 *chrRom;
-        u8 *prgRom;
+    Header header;
+    u8 *prgRam;
+    u8 *chrRom;
+    u8 *prgRom;
 };
 
 extern Rom *currentRom;
