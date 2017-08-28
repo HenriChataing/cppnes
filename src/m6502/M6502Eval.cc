@@ -6,6 +6,7 @@
 #include "M6502Eval.h"
 #include "M6502Asm.h"
 #include "Memory.h"
+#include "exception.h"
 
 using namespace M6502;
 
@@ -906,13 +907,7 @@ void runOpcode(u8 opcode)
 
     /* Exclude jamming instructions. */
     if (Asm::instructions[opcode].jam) {
-        // error("jamming instruction, stopping execution\n");
-        // error("  PC $%04x\n", cpu.regs.pc);
-        // error("  opcode %02x\n", opcode);
-        std::cerr << "jamming instruction, stopping execution" << std::endl;
-        std::cerr << "  PC $" << (int)currentState->regs.pc << std::endl;
-        std::cerr << "  opcode $" << (int)opcode << std::endl;
-        throw "Jamming instruction";
+        throw JammingInstruction(currentState->regs.pc, opcode);
     }
 
     /* Interpret instruction. */
@@ -1220,10 +1215,7 @@ void runOpcode(u8 opcode)
         CASE_LD_IMM(AXS, AXS);
 
         default:
-            // error("unsupported instruction, stopping execution\n");
-            // error("  PC $%04x\n", cpu.regs.pc);
-            // error("  opcode %02x\n", opcode);
-            throw "Unsupported instruction";
+            throw UnsupportedInstruction(currentState->regs.pc, opcode);
     }
 
     currentState->cycles += Asm::instructions[opcode].cycles;

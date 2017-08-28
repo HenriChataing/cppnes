@@ -4,6 +4,7 @@
 #include <iomanip>
 
 #include "Rom.h"
+#include "exception.h"
 
 /**
  * The iNes file format is organized as follow:
@@ -36,7 +37,7 @@ Rom::Rom(const char *file)
 {
     FILE *fd = fopen(file, "r");
     if (fd == NULL)
-        throw "Cannot read from file";
+        throw std::invalid_argument("Cannot read from file");
 
     size_t n;
     int r = 0;
@@ -44,15 +45,13 @@ Rom::Rom(const char *file)
     u8 mapperType;
 
     n = fread((void *)&header, sizeof(struct Header), 1, fd);
-    if (n == 0) {
+    if (n == 0)
         goto fail;
-    }
 
     /* Check file format. */
     if (header.nes[0] != 'N' || header.nes[1] != 'E' ||
-        header.nes[2] != 'S' || header.nes[3] != 0x1a) {
+        header.nes[2] != 'S' || header.nes[3] != 0x1a)
         goto fail;
-    }
 
     /* Dump header. */
     std::cerr << "Detected iNES ROM" << std::hex << std::endl;
@@ -89,7 +88,6 @@ Rom::Rom(const char *file)
     mapperType = (header.ctrl[1] & 0xf0) | (header.ctrl[0] >> 4);
     if (mappers[mapperType] == NULL) {
         std::cerr << "Unsupported mapper type " << (int)mapperType << std::endl;
-        r = ENOSYS;
         goto fail;
     } else {
         std::cerr << "Selected mapper " << (int)mapperType << std::endl;
@@ -99,17 +97,13 @@ Rom::Rom(const char *file)
     prom = new u8[header.prom * 0x4000];
     pram = new u8[header.pram * 0x2000];
 
-    if (prom == NULL || pram == NULL) {
-        r = ENOMEM;
+    if (prom == NULL || pram == NULL)
         goto fail;
-    }
 
     if (header.crom > 0) {
         crom = new u8[header.crom * 0x2000];
-        if (crom == NULL) {
-            r = ENOMEM;
+        if (crom == NULL)
             goto fail;
-        }
     } else
         crom = NULL;
 
@@ -120,10 +114,8 @@ Rom::Rom(const char *file)
     std::cerr << std::endl;
 
     r = fread(prom, header.prom * 0x4000 * sizeof(u8), 1, fd);
-    if (r == 0) {
-        r = ENOMEM;
+    if (r == 0)
         goto fail;
-    }
 
     /* Load the CHR-ROM bank(s). */
     if (header.crom > 0) {
@@ -133,10 +125,8 @@ Rom::Rom(const char *file)
         std::cerr << std::endl;
 
         r = fread(crom, header.crom * 0x2000 * sizeof(u8), 1, fd);
-        if (r == 0) {
-            r = ENOMEM;
+        if (r == 0)
             goto fail;
-        }
     }
 
     /* Setup up the ROM object and install the selected mapper. */
@@ -151,5 +141,5 @@ fail:
     delete crom;
     delete pram;
     fclose(fd);
-    throw "ROM load failure";
+    throw InvalidRom();
 }

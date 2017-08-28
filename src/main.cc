@@ -20,8 +20,8 @@ int main(int argc, char *argv[])
         Events::init();
         Core::emulate();
         N2C02::quit();
-    } catch (const char *str) {
-        std::cerr << "Fatal error (main): " << str << std::endl;
+    } catch (const std::exception &exc) {
+        std::cerr << "Fatal error (main): " << exc.what() << std::endl;
     }
     return 0;
 }

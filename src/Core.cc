@@ -44,8 +44,8 @@ void emulate()
             if (Events::isQuit())
                 break;
         }
-    } catch (char const * s) {
-        std::cerr << "Fatal error (core): " << s << std::endl;
+    } catch (const std::exception &exc) {
+        std::cerr << "Fatal error (core): " << exc.what() << std::endl;
         Events::quit();
     }
 }
