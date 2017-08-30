@@ -1,5 +1,6 @@
 
 #include "type.h"
+#include "exception.h"
 #include "Core.h"
 #include "Memory.h"
 #include "M6502State.h"
@@ -30,6 +31,9 @@ void emulate()
             /* Catch interrupts */
             if (M6502::currentState->nmi) {
                 M6502::Eval::triggerNMI();
+            } else
+            if (M6502::currentState->irq) {
+                M6502::Eval::triggerIRQ();
             }
             /* Evaluate next instruction */
             u8 opcode = Memory::load(M6502::currentState->regs.pc);

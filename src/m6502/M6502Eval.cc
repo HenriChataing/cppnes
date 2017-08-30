@@ -885,7 +885,9 @@ void triggerNMI()
  */
 void triggerIRQ()
 {
-    /// FIXME check if I status bit set
+    /* Check if IRQ mask bit is set. */
+    if (P & P_I)
+        return;
     PUSH(PC_HI);
     PUSH(PC_LO);
     PUSH((P & ~0x30) | 0x20);
