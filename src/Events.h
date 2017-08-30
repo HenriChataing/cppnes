@@ -23,6 +23,7 @@ void bindKeyboardEvent(int sym, bool *status);
 void init();
 void quit();
 bool isQuit();
+bool isPaused();
 
 };
 

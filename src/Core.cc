@@ -11,6 +11,8 @@
 
 #include <iostream>
 #include <ctime>
+#include <chrono>
+#include <thread>
 
 using namespace std;
 
@@ -47,6 +49,10 @@ void emulate()
             }
             if (Events::isQuit())
                 break;
+            while (Events::isPaused()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+
         }
     } catch (const UnsupportedInstruction &exc) {
         std::cerr << "Fatal error (core): " << exc.what();
