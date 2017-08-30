@@ -158,6 +158,8 @@ static void store(u16 addr, u8 val);
  * @brief Setup the PPU memory map and initialise the SDL objects.
  */
 State::State()
+    : scanline(0), cycle(0), bus(0), readBuffer(0),
+        regs({ 0 }), ctrl({ 0 }), mask({ 0 }), status(0), oamaddr(0)
 {
     ctrl.i = 0x1;
 }
@@ -838,6 +840,7 @@ static inline void fetchSpriteBitmap(void)
     oamreg.cnt = oamsec.cnt;
 }
 
+#if 0
 static void prerenderBackground(void)
 {
     u16 v = currentState->regs.t;
@@ -888,7 +891,6 @@ static void prerenderBackground(void)
     }
 }
 
-#if 0
 /**
  * @brief Pre-render the visible sprites.
  */

@@ -15,15 +15,14 @@ public:
         Memory::prgBankMask = 0x3fff;
         Memory::prgBankShift = 14;
         Memory::prgBankMax = 1;
+        Memory::prgRamEnabled = false;
 
         if (rom->chrRom == NULL) {
-            rom->header.crom = 1;
-            rom->chrRom = new u8[0x2000];
-            if (rom->chrRom == NULL)
-                throw "NROM: Cannot allocate CHR-RAM";
             _chrRam = true;
-        } else
+        } else {
+            memcpy(Memory::chrRom, rom->chrRom, 0x2000);
             _chrRam = false;
+        }
 
         if (rom->header.prom >= 2) {
             Memory::prgBank[0] = rom->prgRom;
@@ -32,7 +31,6 @@ public:
             Memory::prgBank[0] = rom->prgRom;
             Memory::prgBank[1] = rom->prgRom;
         }
-        memcpy(Memory::chrRom, rom->chrRom, 0x2000);
     }
 
     ~NROM() {
@@ -44,7 +42,7 @@ public:
 
     void storeChr(u16 addr, u8 val) {
         if (_chrRam)
-            rom->chrRom[addr] = val;
+            Memory::chrRom[addr] = val;
     }
 
 private:
