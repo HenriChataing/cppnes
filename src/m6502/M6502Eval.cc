@@ -623,14 +623,12 @@ static u16 getIndirect(void) {
      * In this case, the LSB is fetched from $xxff and the MSB from $xx00.
      * http://obelisk.me.uk/6502/reference.html#JMP
      */
-#ifdef CPU_6502
     if (lo == 0xff) {
         hi = (hi << 8) & 0xff00;
         lo = Memory::load(hi | lo);
         hi = Memory::load(hi);
         return WORD(hi, lo);
     } else
-#endif
         return Memory::loadw(WORD(hi, lo));
 }
 
