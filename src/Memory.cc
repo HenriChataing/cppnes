@@ -30,14 +30,14 @@ u8 *prgBank[4];
 /**
  * CHR rom, addresses 0x0000-0x1fff of the PPU address space
  */
-u8 chrRom[0x2000];
+u8 *chrRom[2];
 
 /**
  * PRG ram, addresses 0x6000-0x7fff
  */
-bool prgRamEnabled;
-bool prgRamWriteProtected;
-u8 prgRam[0x2000];
+bool prgRamEnabled = false;
+bool prgRamWriteProtected = false;
+u8 *prgRam;
 
 /**
  * Initiate a DMA tranfer with the 2C02 PPU memory.

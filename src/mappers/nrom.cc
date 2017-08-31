@@ -41,8 +41,12 @@ public:
     }
 
     void storeChr(u16 addr, u8 val) {
-        if (_chrRam)
-            Memory::chrRom[addr] = val;
+        if (_chrRam) {
+            if (addr < 0x1000)
+                Memory::chrRom[0][addr] = val;
+            else
+                Memory::chrRom[1][addr & 0xfff] = val;
+        }
     }
 
 private:

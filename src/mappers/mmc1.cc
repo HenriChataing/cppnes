@@ -22,6 +22,10 @@ public:
         if (rom->prgRam == NULL)
             throw "MMC1: Missing PRG-RAM";
 
+        Memory::prgRam = rom->prgRam;
+        Memory::prgRamEnabled = true;
+        Memory::prgRamWriteProtected = true;
+
         /* Allocate CHR-RAM */
         if (rom->chrRom == NULL) {
             rom->chrRom = new u8[0x2000];
@@ -34,6 +38,8 @@ public:
         /* Initial banks. */
         Memory::prgBank[0] = rom->prgRom;
         Memory::prgBank[1] = rom->prgRom;
+        Memory::chrRom[0] = rom->chrRom;
+        Memory::chrRom[1] = rom->chrRom + 0x1000;
         writeControlRegister(0x0c);
     }
 
@@ -71,8 +77,12 @@ public:
     }
 
     void storeChr(u16 addr, u8 val) {
-        if (_chrRam)
-            Memory::chrRom[addr] = val;
+        if (_chrRam) {
+            if (addr < 0x1000)
+                Memory::chrRom[0][addr] = val;
+            else
+                Memory::chrRom[1][addr & 0xfff] = val;
+        }
     }
 
 private:
@@ -89,16 +99,19 @@ private:
         _chrBank0Register = val;
         if (_controlRegister & 0x10) {
             /* Swap CHR-ROM bank 0 */
-            memcpy(
-                Memory::chrRom,
-                &rom->chrRom[(val & 0x1f) * 0x1000],
-                0x1000);
+            Memory::chrRom[0] = &rom->chrRom[(val & 0x1f) * 0x1000];
+            // memcpy(
+            //     Memory::chrRom,
+            //     &rom->chrRom[(val & 0x1f) * 0x1000],
+            //     0x1000);
         } else {
             /* Swap CHR-ROM bank 0 and 1 */
-            memcpy(
-                Memory::chrRom,
-                &rom->chrRom[(val & 0x1f) * 0x1000],
-                0x2000);
+            Memory::chrRom[0] = &rom->chrRom[(val & 0x1e) * 0x1000];
+            Memory::chrRom[1] = Memory::chrRom[0] + 0x1000;
+            // memcpy(
+            //     Memory::chrRom,
+            //     &rom->chrRom[(val & 0x1e) * 0x1000],
+            //     0x2000);
         }
     }
 
@@ -107,16 +120,17 @@ private:
         _chrBank1Register = val;
         if (_controlRegister & 0x10) {
             /* Swap CHR-ROM bank 1 */
-            memcpy(
-                Memory::chrRom + 0x1000,
-                &rom->chrRom[(val & 0x1f) * 0x1000],
-                0x1000);
+            Memory::chrRom[1] = &rom->chrRom[(val & 0x1f) * 0x1000];
+            // memcpy(
+            //     Memory::chrRom + 0x1000,
+            //     &rom->chrRom[(val & 0x1f) * 0x1000],
+            //     0x1000);
         }
     }
 
     inline void writePrgBankRegister(u8 val)
     {
-        Memory::prgRamEnabled = (val & 0x10) == 0;
+        Memory::prgRamWriteProtected = (val & 0x10) != 0;
         _prgBankRegister = val;
         u8 *prgRom = rom->prgRom;
 
