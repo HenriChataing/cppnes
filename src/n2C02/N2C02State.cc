@@ -458,11 +458,8 @@ void setScanlineCallback(void (*callback)(int, int))
  */
 static u8 load(u16 addr)
 {
-    if (addr < 0x1000)
-        return Memory::chrRom[0][addr];
-    else
     if (addr < 0x2000)
-        return Memory::chrRom[1][addr & 0xfff];
+        return Memory::chrRom[addr];
     else
     if (addr < 0x3f00)
         return ntables[(addr >> 10) & 0x3][addr & 0x3ff];
@@ -688,8 +685,8 @@ static inline void fetchAttribute(void)
 static inline void fetchBitmap(void)
 {
     u16 pa = currentState->ctrl.b + ((currentState->regs.nt << 4) | (currentState->regs.v >> 12));
-    u16 lo = load(pa);
-    u16 hi = load(pa | 0x8);
+    u16 lo = Memory::chrRom[pa];
+    u16 hi = Memory::chrRom[pa | 0x8];
     currentState->regs.pats = (currentState->regs.pats & 0xffff0000) | interleave(lo, hi);
     currentState->regs.pall = currentState->regs.at & 0x3;;
 }
@@ -837,8 +834,8 @@ static inline void fetchSpriteBitmap(void)
             pa = pa + offset;
     }
 
-    oamreg.bitmap[2 * n] = load(pa);
-    oamreg.bitmap[2 * n + 1] = load(pa + 8);
+    oamreg.bitmap[2 * n] = Memory::chrRom[pa];
+    oamreg.bitmap[2 * n + 1] = Memory::chrRom[pa + 8];
     oamreg.sprites[n].val = oamsec.sprites[n].val;
     oamreg.cnt = oamsec.cnt;
 }
@@ -1170,8 +1167,8 @@ static void drawPatternTables(int sx, int sy)
 
     for (addr = 0x0000; addr < 0x2000; addr += 16) {
         for (line = 0; line < 8; line++) {
-            u8 lo = load(addr + line);
-            u8 hi = load(addr + line + 8);
+            u8 lo = Memory::chrRom[addr + line];
+            u8 hi = Memory::chrRom[addr + line + 8];
             for (col = 7; col >= 0; col--) {
                 int p =
                     ((lo >> col) & 0x1) |
@@ -1206,8 +1203,8 @@ static void drawNameTable(int sx, int sy, int sel)
     for (u16 addr = 0x0; addr < 0x3c0; addr++) {
         u8 nt = ntable[addr];
         for (u16 line = 0; line < 8; line++) {
-            u8 lo = load(ptable + (nt << 4) + line);
-            u8 hi = load(ptable + (nt << 4) + line + 8);
+            u8 lo = Memory::chrRom[ptable + (nt << 4) + line];
+            u8 hi = Memory::chrRom[ptable + (nt << 4) + line + 8];
             for (int col = 7; col >= 0; col--) {
                 int p =
                     ((lo >> col) & 0x1) |

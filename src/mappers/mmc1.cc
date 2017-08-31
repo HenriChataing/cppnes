@@ -38,8 +38,8 @@ public:
         /* Initial banks. */
         Memory::prgBank[0] = rom->prgRom;
         Memory::prgBank[1] = rom->prgRom;
-        Memory::chrRom[0] = rom->chrRom;
-        Memory::chrRom[1] = rom->chrRom + 0x1000;
+        swapChrRomBank(0, rom->chrRom);
+        swapChrRomBank(1, rom->chrRom + 0x1000);
         writeControlRegister(0x0c);
     }
 
@@ -76,17 +76,7 @@ public:
         _loadRegister = 0;
     }
 
-    void storeChr(u16 addr, u8 val) {
-        if (_chrRam) {
-            if (addr < 0x1000)
-                Memory::chrRom[0][addr] = val;
-            else
-                Memory::chrRom[1][addr & 0xfff] = val;
-        }
-    }
-
 private:
-    bool _chrRam;
     uint _loadRegisterSize; /* Number of valid data bits in the load register */
     u8 _loadRegister;
     u8 _controlRegister;
@@ -99,33 +89,20 @@ private:
         _chrBank0Register = val;
         if (_controlRegister & 0x10) {
             /* Swap CHR-ROM bank 0 */
-            Memory::chrRom[0] = &rom->chrRom[(val & 0x1f) * 0x1000];
-            // memcpy(
-            //     Memory::chrRom,
-            //     &rom->chrRom[(val & 0x1f) * 0x1000],
-            //     0x1000);
+            swapChrRomBank(0, &rom->chrRom[(val & 0x1f) * 0x1000]);
         } else {
             /* Swap CHR-ROM bank 0 and 1 */
-            Memory::chrRom[0] = &rom->chrRom[(val & 0x1e) * 0x1000];
-            Memory::chrRom[1] = Memory::chrRom[0] + 0x1000;
-            // memcpy(
-            //     Memory::chrRom,
-            //     &rom->chrRom[(val & 0x1e) * 0x1000],
-            //     0x2000);
+            swapChrRomBank(0, &rom->chrRom[(val & 0x1e) * 0x1000]);
+            swapChrRomBank(1, &rom->chrRom[((val & 0x1e) + 1) * 0x1000]);
         }
     }
 
     inline void writeChrBank1Register(u8 val)
     {
         _chrBank1Register = val;
-        if (_controlRegister & 0x10) {
+        if (_controlRegister & 0x10)
             /* Swap CHR-ROM bank 1 */
-            Memory::chrRom[1] = &rom->chrRom[(val & 0x1f) * 0x1000];
-            // memcpy(
-            //     Memory::chrRom + 0x1000,
-            //     &rom->chrRom[(val & 0x1f) * 0x1000],
-            //     0x1000);
-        }
+            swapChrRomBank(1, &rom->chrRom[(val & 0x1f) * 0x1000]);
     }
 
     inline void writePrgBankRegister(u8 val)

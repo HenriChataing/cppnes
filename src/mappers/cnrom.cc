@@ -7,23 +7,17 @@
 #include "Mapper.h"
 #include "Memory.h"
 
-class NROM: public Mapper
+class CNROM: public Mapper
 {
 public:
-    NROM(Rom *rom) : Mapper(rom, "NROM") {
+    CNROM(Rom *rom) : Mapper(rom, "CNROM") {
         Memory::prgBankSize = 0x4000;
         Memory::prgBankMask = 0x3fff;
         Memory::prgBankShift = 14;
         Memory::prgBankMax = 1;
-        Memory::prgRamEnabled = false;
 
-        if (rom->chrRom == NULL) {
-            rom->chrRom = new u8[0x2000];
-            if (rom->chrRom == NULL)
-                throw "MMC1: Cannot allocate CHR-RAM";
-            _chrRam = true;
-        } else
-            _chrRam = false;
+        if (rom->chrRom == NULL)
+            throw "CNROM: No CHR-ROM bank detected";
 
         swapChrRomBank(0, rom->chrRom);
         swapChrRomBank(1, rom->chrRom + 0x1000);
@@ -37,16 +31,19 @@ public:
         }
     }
 
-    ~NROM() {
+    ~CNROM() {
     }
 
     void storePrg(u16 addr, u8 val) {
-        (void)addr; (void)val;
+        (void)addr;
+        u8 *chrBank = &rom->chrRom[val * 0x2000];
+        swapChrRomBank(0, chrBank);
+        swapChrRomBank(1, chrBank + 0x1000);
     }
 };
 
-static Mapper *createNROM(Rom *rom) {
-    return new NROM(rom);
+static Mapper *createCNROM(Rom *rom) {
+    return new CNROM(rom);
 }
 
 /**
@@ -55,6 +52,5 @@ static Mapper *createNROM(Rom *rom) {
 static void insert(void) __attribute__((constructor));
 static void insert(void)
 {
-    mappers[0] = createNROM;
+    mappers[3] = createCNROM;
 }
-
