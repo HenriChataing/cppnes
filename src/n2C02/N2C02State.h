@@ -28,6 +28,8 @@
 #ifndef _N2C02STATE_H_INCLUDED_
 #define _N2C02STATE_H_INCLUDED_
 
+#include <functional>
+
 #include "type.h"
 
 namespace N2C02 {
@@ -158,7 +160,7 @@ void setVerticalMirroring(void);
 void setHorizontalMirroring(void);
 void set1ScreenMirroring(int upper);
 void set4ScreenMirroring(void);
-void setScanlineCallback(void (*callback)(int, int));
+void setScanlineCallback(std::function<void(int, int)> callback);
 
 int init();
 void quit();

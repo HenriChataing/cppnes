@@ -98,8 +98,18 @@ struct sprite {
     };
 };
 
-/* Callbacks. */
-static void (*scanlineCallback)(int, int);
+/*
+ * Scanline callback. If set, the function is called at the end of each
+ * render line. The set switch \p scanlineCallbackSet is used because
+ * checking the validity is too slow
+ *   ```
+ *   if (scanlineCallback) {
+ *      ...
+ *   }
+ *   ```
+ */
+static std::function<void(int, int)> scanlineCallback;
+static bool scanlineCallbackSet = false;
 
 /** SDL objects. */
 static SDL_Window *window;
@@ -446,9 +456,10 @@ void set4ScreenMirroring(void)
 /**
  * Attach a callback called at the end of each scanline.
  */
-void setScanlineCallback(void (*callback)(int, int))
+void setScanlineCallback(std::function<void(int, int)> callback)
 {
     scanlineCallback = callback;
+    scanlineCallbackSet = true;
 }
 
 /**
@@ -984,7 +995,7 @@ void dot(void)
     /* Odd frame tracking, the last cycle is skipped. */
     static bool oddframe = 0;
 
-    if (scanlineCallback && RENDERON &&
+    if (scanlineCallbackSet && RENDERON &&
         currentState->scanline < 240 && currentState->cycle == 260)
         scanlineCallback(currentState->scanline, currentState->cycle);
 
