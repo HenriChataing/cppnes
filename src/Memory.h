@@ -3,6 +3,8 @@
 #define _MEMORY_H_INCLUDED_
 
 #include <cstdlib>
+#include <cassert>
+#include <cstring>
 
 #include "type.h"
 
@@ -85,6 +87,62 @@ enum {
     IRQ_ADDR = 0xfffe,
 };
 
+};
+
+/**
+ * @brief Implementation of a fixed size memory with switachable banks.
+ * @param memoryOrder       order of the mapped memory size
+ *                          (the memory size is 1 << \p memoryOrder)
+ * @param bankOrer          order of a bank size
+ *                          (the bank size is 1 << \p bankOrder)
+ */
+template<int memoryOrder, int bankOrder>
+class BankMemory
+{
+public:
+    BankMemory() : readOnly(true) {}
+    ~BankMemory() {}
+
+    /**
+     * @brief Set the bank \p bankNr to the bank \p bankSel of the source
+     *  memory.
+     */
+    void swapBank(int bankNr, int bankSel) {
+        assert(source != NULL);
+        assert(bankNr < (1 << (memoryOrder - bankOrder)));
+        u8 *ptr = &source[bankSel << bankOrder];
+        if (squash && banks[bankNr] != ptr) {
+            memcpy(&squash[bankNr << bankOrder], ptr, 1 << bankOrder);
+        }
+        banks[bankNr] = ptr;
+    }
+
+    /**
+     * @brief Set the bank \p bankNr to the provided bank buffer.
+     */
+    void swapBank(int bankNr, u8 *ptr) {
+        assert(source == NULL);
+        assert(bankNr < (1 << (memoryOrder - bankOrder)));
+        if (squash && banks[bankNr] != ptr) {
+            memcpy(&squash[bankNr << bankOrder], ptr, 1 << bankOrder);
+        }
+        banks[bankNr] = ptr;
+    }
+
+    void store(u16 addr, u8 val) {
+        if (!readOnly) {
+            const u16 mask = (1 << bankOrder) - 1;
+            banks[addr >> bankOrder][addr & mask] = val;
+            if (squash)
+                squash[addr] = val;
+            /// TODO handle mirroring.
+        }
+    }
+
+    bool readOnly;
+    u8 *banks[1 << (memoryOrder - bankOrder)];
+    u8 *source;
+    u8 *squash;
 };
 
 #endif /* _MEMORY_H_INCLUDED_ */
