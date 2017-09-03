@@ -1060,7 +1060,7 @@ void dot(void)
             drawPalettes(0, 0);
             if (ntables[0] == ntables[1]) {
                 drawNameTable(PPU_WIDTH, 0, 0);
-                drawNameTable(PPU_WIDTH, PPU_HEIGHT, 1);
+                drawNameTable(PPU_WIDTH, PPU_HEIGHT, 2);
                 drawAttrTable(PPU_WIDTH / 2, PPU_HEIGHT, 0);
                 drawAttrTable(PPU_WIDTH / 2, PPU_HEIGHT + PPU_HEIGHT / 2, 1);
             } else {
