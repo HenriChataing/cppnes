@@ -10,7 +10,9 @@
 class NROM: public Mapper
 {
 public:
-    NROM(Rom *rom) : Mapper(rom, "NROM") {
+    bool chrRomReadOnly;
+
+    NROM(Rom *rom) : Mapper(rom, "NROM"), chrRomReadOnly(true) {
         Memory::prgBankSize = 0x4000;
         Memory::prgBankMask = 0x3fff;
         Memory::prgBankShift = 14;
@@ -21,12 +23,10 @@ public:
             rom->chrRom = new u8[0x2000];
             if (rom->chrRom == NULL)
                 throw "MMC1: Cannot allocate CHR-RAM";
-            _chrRam = true;
-        } else
-            _chrRam = false;
+            chrRomReadOnly = false;
+        }
 
-        swapChrRomBank(0, rom->chrRom);
-        swapChrRomBank(1, rom->chrRom + 0x1000);
+        memcpy(Memory::chrRom, rom->chrRom, 0x2000);
 
         if (rom->header.prom >= 2) {
             Memory::prgBank[0] = rom->prgRom;
@@ -42,6 +42,11 @@ public:
 
     void storePrg(u16 addr, u8 val) {
         (void)addr; (void)val;
+    }
+
+    void storeChr(u16 addr, u8 val) {
+        if (!chrRomReadOnly)
+            Memory::chrRom[addr] = val;
     }
 };
 

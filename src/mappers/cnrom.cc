@@ -10,6 +10,9 @@
 class CNROM: public Mapper
 {
 public:
+    /* CHR-ROM memory of 0x2000 bytes, with on switchable 0x2000 byte bank. */
+    BankMemory<13, 13> chrRom;
+
     CNROM(Rom *rom) : Mapper(rom, "CNROM") {
         Memory::prgBankSize = 0x4000;
         Memory::prgBankMask = 0x3fff;
@@ -19,8 +22,10 @@ public:
         if (rom->chrRom == NULL)
             throw "CNROM: No CHR-ROM bank detected";
 
-        swapChrRomBank(0, rom->chrRom);
-        swapChrRomBank(1, rom->chrRom + 0x1000);
+        chrRom.readOnly = true;
+        chrRom.squash = Memory::chrRom;
+        chrRom.source = rom->chrRom;
+        chrRom.swapBank(0, 0);
 
         if (rom->header.prom >= 2) {
             Memory::prgBank[0] = rom->prgRom;
@@ -36,10 +41,13 @@ public:
 
     void storePrg(u16 addr, u8 val) {
         (void)addr;
-        u8 *chrBank = &rom->chrRom[val * 0x2000];
-        swapChrRomBank(0, chrBank);
-        swapChrRomBank(1, chrBank + 0x1000);
+        chrRom.swapBank(0, val);
     }
+
+    void storeChr(u16 addr, u8 val) {
+        chrRom.store(addr, val);
+    }
+
 };
 
 static Mapper *createCNROM(Rom *rom) {

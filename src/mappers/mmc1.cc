@@ -11,6 +11,9 @@
 class MMC1: public Mapper
 {
 public:
+    /* CHR-ROM memory of 0x2000 bytes, with 0x1000 byte banks. */
+    BankMemory<13, 12> chrRom;
+
     MMC1(Rom *rom) : Mapper(rom, "MMC1") {
         /* Define ROM geometry. */
         Memory::prgBankSize = 0x4000;
@@ -31,15 +34,17 @@ public:
             rom->chrRom = new u8[0x2000];
             if (rom->chrRom == NULL)
                 throw "MMC1: Cannot allocate CHR-RAM";
-            _chrRam = true;
+            chrRom.readOnly = false;
         } else
-            _chrRam = false;
+            chrRom.readOnly = true;
 
         /* Initial banks. */
         Memory::prgBank[0] = rom->prgRom;
         Memory::prgBank[1] = rom->prgRom;
-        swapChrRomBank(0, rom->chrRom);
-        swapChrRomBank(1, rom->chrRom + 0x1000);
+        chrRom.squash = Memory::chrRom;
+        chrRom.source = rom->chrRom;
+        chrRom.swapBank(0, 0);
+        chrRom.swapBank(1, 1);
         writeControlRegister(0x0c);
     }
 
@@ -76,6 +81,10 @@ public:
         _loadRegister = 0;
     }
 
+    void storeChr(u16 addr, u8 val) {
+        return chrRom.store(addr, val);
+    }
+
 private:
     uint _loadRegisterSize; /* Number of valid data bits in the load register */
     u8 _loadRegister;
@@ -89,11 +98,11 @@ private:
         _chrBank0Register = val;
         if (_controlRegister & 0x10) {
             /* Swap CHR-ROM bank 0 */
-            swapChrRomBank(0, &rom->chrRom[(val & 0x1f) * 0x1000]);
+            chrRom.swapBank(0, val & 0x1f);
         } else {
             /* Swap CHR-ROM bank 0 and 1 */
-            swapChrRomBank(0, &rom->chrRom[(val & 0x1e) * 0x1000]);
-            swapChrRomBank(1, &rom->chrRom[((val & 0x1e) + 1) * 0x1000]);
+            chrRom.swapBank(0, val & 0x1e);
+            chrRom.swapBank(1, (val & 0x1e) + 1);
         }
     }
 
@@ -102,7 +111,7 @@ private:
         _chrBank1Register = val;
         if (_controlRegister & 0x10)
             /* Swap CHR-ROM bank 1 */
-            swapChrRomBank(1, &rom->chrRom[(val & 0x1f) * 0x1000]);
+            chrRom.swapBank(1, val & 0x1f);
     }
 
     inline void writePrgBankRegister(u8 val)

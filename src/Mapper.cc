@@ -7,25 +7,25 @@
 Mapper::Mapper(Rom *rom, const std::string name)
     : rom(rom), name(name), _chrRam(false)
 {
-    _chrRom[0] = NULL;
-    _chrRom[1] = NULL;
+    _chrBank[0] = NULL;
+    _chrBank[1] = NULL;
 }
 
 void Mapper::storeChr(u16 addr, u8 val)
 {
     if (_chrRam) {
-        if (_chrRom[0] == _chrRom[1]) {
-            _chrRom[0][addr & 0xfff] = val;
+        if (_chrBank[0] == _chrBank[1]) {
+            _chrBank[0][addr & 0xfff] = val;
             Memory::chrRom[addr & 0xfff] = val;
             Memory::chrRom[0x1000 + (addr & 0xfff)] = val;
         }
         else
         if (addr < 0x1000) {
-            _chrRom[0][addr] = val;
+            _chrBank[0][addr] = val;
             Memory::chrRom[addr] = val;
         }
         else {
-            _chrRom[1][addr & 0xfff] = val;
+            _chrBank[1][addr & 0xfff] = val;
             Memory::chrRom[addr] = val;
         }
     }
@@ -38,8 +38,8 @@ void Mapper::storeChr(u16 addr, u8 val)
  */
 void Mapper::swapChrRomBank(int nr, u8 *bank)
 {
-    if (_chrRom[nr] != bank) {
+    if (_chrBank[nr] != bank) {
         memcpy(&Memory::chrRom[nr * 0x1000], bank, 0x1000);
-        _chrRom[nr] = bank;
+        _chrBank[nr] = bank;
     }
 }
