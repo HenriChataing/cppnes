@@ -13,16 +13,35 @@ namespace M6502 {
 class Instruction
 {
 public:
-    Instruction(X86::Emitter &emit, u16 address, u8 opcode);
+    Instruction(u16 address, u8 opcode, u8 op0 = 0, u8 op1 = 0);
     ~Instruction();
-    void run();
+
     void setNext(Instruction *instr);
+    void compile(X86::Emitter &emit);
+    void run();
 
     u16 address;
     u16 branchAddress;
+
     u8 opcode;
-    bool exit;
+    u8 operand0;
+    u8 operand1;
+
+    /**
+     * Identifies branching instructions.
+     */
     bool branch;
+
+    /**
+     * This instruction is a valid entry point. The compiled native code can
+     * only be executed starting on an entry point.
+     */
+    bool entry;
+
+    /**
+     * This instruction triggers an exit from the native code.
+     */
+    bool exit;
 
     friend class InstructionCache;
 
@@ -40,7 +59,7 @@ public:
     ~InstructionCache();
 
     Instruction *fetchInstruction(u16 address);
-    Instruction *cacheInstruction(u16 address, u8 opcode);
+    Instruction *cacheInstruction(u16 address);
     Instruction *cacheBlock(u16 address);
 
     size_t getSize() const { return _asmEmitter.getSize(); }

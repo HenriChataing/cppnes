@@ -11,6 +11,41 @@
 
 using namespace M6502;
 
+Instruction::Instruction(u16 address, u8 opcode, u8 op0, u8 op1)
+    : address(address), opcode(opcode), operand0(op0), operand1(op1),
+      entry(false), exit(false)
+{
+    if (Asm::instructions[opcode].type == Asm::REL) {
+        u8 off = op0;
+        if (off & 0x80) {
+            off = ~off + 1;
+            branchAddress = address + 2 - off;
+        } else
+            branchAddress = address + 2 + off;
+        branch = true;
+    } else {
+        branch = false;
+    }
+
+    switch (opcode) {
+        case BRK_IMP:
+        case JMP_ABS:
+        case JMP_IND:
+        case JSR_ABS:
+        case RTI_IMP:
+        case RTS_IMP:
+            exit = true;
+            break;
+        default:
+            break;
+    }
+
+    next = NULL;
+    jump = NULL;
+    nativeCode = NULL;
+    nativeBranchAddress = NULL;
+}
+
 /**
  * TODO list
  *  - track which flags are tested in an instruction block, and pass on that
@@ -46,12 +81,19 @@ Instruction *InstructionCache::fetchInstruction(u16 address)
     return _cache[offset];
 }
 
-Instruction *InstructionCache::cacheInstruction(u16 address, u8 opcode)
+Instruction *InstructionCache::cacheInstruction(u16 address)
 {
     uint offset = address - 0x8000;
-    if (_cache[offset] == NULL)
-        _cache[offset] = new Instruction(_asmEmitter, address, opcode);
-    return _cache[offset];
+    if (_cache[offset] != NULL)
+        return _cache[offset];
+    u8 opcode = Memory::load(address);
+    size_t bytes = Asm::instructions[opcode].bytes;
+    /// FIXME check for bank overflow
+    u8 op0 = bytes > 1 ? Memory::load(address + 1) : 0;
+    u8 op1 = bytes > 2 ? Memory::load(address + 2) : 0;
+    Instruction *instr = new Instruction(address, opcode, op0, op1);
+    _cache[offset] = instr;
+    return instr;
 }
 
 Instruction *InstructionCache::cacheBlock(u16 address)
@@ -77,8 +119,7 @@ Instruction *InstructionCache::cacheBlock(u16 address)
             break;
         }
 
-        u8 opcode = Memory::load(pc);
-        instr = cacheInstruction(pc, opcode);
+        instr = cacheInstruction(pc);
         if (prev != NULL)
             prev->next = instr;
         if (instr->branch)
@@ -105,7 +146,7 @@ Instruction *InstructionCache::cacheBlock(u16 address)
             continue;
         }
         prev = instr;
-        pc += Asm::instructions[opcode].bytes;
+        pc += Asm::instructions[instr->opcode].bytes;
     }
 
     // _asmEmitter.dump(start);
@@ -1003,7 +1044,7 @@ static u16 getIndirect(void) {
  */
 #define CASE_LD_MEM_GEN(op, load, fun, r, ...)                                 \
     case op: {                                                                 \
-        load(emit, pc, fun, r);                                                \
+        load(emit, address, fun, r);                                           \
         break;                                                                 \
     }
 
@@ -1013,7 +1054,7 @@ static u16 getIndirect(void) {
  */
 #define CASE_ST_MEM(op, r, store)                                              \
     case op: {                                                                 \
-        store(emit, pc, r);                                                    \
+        store(emit, address, r);                                               \
         break;                                                                 \
     }
 
@@ -1087,41 +1128,23 @@ static u16 getIndirect(void) {
 /** Create a banch instruction with the given condition. */
 #define CASE_BR(op, oppcond)                                                   \
     case op##_REL: {                                                           \
-        u8 __off = Memory::load(pc + 1);                                       \
-        pc += Asm::instructions[op##_REL].bytes;                               \
-        if (__off & 0x80) {                                                    \
-            __off = ~__off + 1;                                                \
-            branchAddress = pc - __off;                                        \
-        } else                                                                 \
-            branchAddress = pc + __off;                                        \
         emit.POPF();                                                           \
         u32 *__next = oppcond();                                               \
         emit.PUSHF();                                                          \
         emit.MOV(X86::eax, (u32)&currentState->cycles);                        \
-        emit.ADD(X86::eax(), (u32)(3 + PAGE_DIFF(pc, branchAddress)));         \
+        emit.ADD(X86::eax(), (u32)(3 + PAGE_DIFF(address + 2, branchAddress))); \
         nativeBranchAddress = emit.JMP();                                      \
         emit.setJump(__next, emit.getPtr());                                   \
         emit.PUSHF();                                                          \
         emit.MOV(X86::eax, (u32)&currentState->cycles);                        \
         emit.ADD(X86::eax(), (u32)2);                                          \
-        branch = true;                                                         \
         break;                                                                 \
     }
 
-Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
-    : address(pc), opcode(opcode), next(NULL), jump(NULL)
+void Instruction::compile(X86::Emitter &emit)
 {
     nativeCode = emit.getPtr();
-    branch = false;
     exit = false;
-
-    // if (pc == 0xcc1e) {
-    //     exit = true;
-    //     emit.MOV(X86::eax, pc);
-    //     emit.POPF();
-    //     emit.RETN();
-    //     return;
-    // }
 
     /* Check jamming instructions. */
     if (Asm::instructions[opcode].jam) {
@@ -1140,17 +1163,8 @@ Instruction::Instruction(X86::Emitter &emit, u16 pc, u8 opcode)
         case JSR_ABS:
         case RTI_IMP:
         case RTS_IMP:
-        // case BCC_REL:
-        // case BCS_REL:
-        // case BEQ_REL:
-        // case BMI_REL:
-        // case BNE_REL:
-        // case BPL_REL:
-        // case BVC_REL:
-        // case BVS_REL:
-
             exit = true;
-            emit.MOV(X86::eax, pc);
+            emit.MOV(X86::eax, address);
             emit.POPF();
             emit.RETN();
             break;

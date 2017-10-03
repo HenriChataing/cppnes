@@ -11,13 +11,13 @@ CFLAGS += -I$(SRCDIR) -I$(SRCDIR)/m6502 -I$(SRCDIR)/n2C02 -I$(SRCDIR)/x86
 LFLAGS := -pg -m32
 LIBS   := -lSDL2 -lpthread
 
-CFLAGS += -DPPU_MAX_FPS
+CFLAGS += -DNDEBUG -DPPU_DEBUG
 # -DPPU_MAX_FPS
-# -DPPU_DEBUG
 
 SRC    := x86/X86Emitter.cc
 SRC    += m6502/M6502State.cc m6502/M6502Eval.cc m6502/M6502Asm.cc m6502/M6502Jit.cc
 SRC    += n2C02/N2C02State.cc
+# SRC    += rp2A03/RP2A03State.cc
 SRC    += mappers/nrom.cc mappers/mmc1.cc mappers/cnrom.cc mappers/mmc3.cc
 SRC    += Memory.cc Events.cc Joypad.cc Rom.cc Core.cc main.cc
 
