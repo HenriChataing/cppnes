@@ -3,6 +3,7 @@
 #define _M6502ASM_H_INCLUDED_
 
 #include <string>
+#include "type.h"
 
 namespace M6502 {
 namespace Asm {
@@ -11,11 +12,20 @@ typedef enum {
     IMM, ZPG, ZPX, ZPY, ABS, ABX, ABY, IND, INX, INY, REL, IMP, ACC
 } addressing;
 
+static const u8 carry       = 1 << 0;
+static const u8 zero        = 1 << 1;
+static const u8 interrupt   = 1 << 2;
+static const u8 decimal     = 1 << 3;
+static const u8 overflow    = 1 << 6;
+static const u8 negative    = 1 << 7;
+
 struct metadata {
     unsigned int bytes;
     unsigned int cycles;
     addressing type;
     const std::string name;
+    u8 rflags;
+    u8 wflags;
     bool unofficial;
     bool jam;
 };
