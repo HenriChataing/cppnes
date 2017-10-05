@@ -98,59 +98,67 @@ Instruction *InstructionCache::cacheInstruction(u16 address)
 
 Instruction *InstructionCache::cacheBlock(u16 address)
 {
-    if (address < 0x8000)
-        return NULL;
-
-    // const u8 *start = _asmEmitter.getPtr();
-
-    Instruction *prev = NULL, *instr;
     u16 pc = address;
+    Instruction *instr = NULL;
+    Instruction *first = NULL;
+    Instruction **last = &first;
+    // _stack.clear();
 
-    while (true)
-    {
-        instr = fetchInstruction(pc);
-        if (instr != NULL) {
-            /*
-             * Using setNext because the compiled instruction is probably
-             * not contiguous.
-             */
-            if (prev != NULL)
-                prev->setNext(instr);
-            break;
-        }
-
+    while (1) {
         instr = cacheInstruction(pc);
-        if (prev != NULL)
-            prev->next = instr;
+        *last = instr;
+        last = &instr->next;
+
+        if (instr->nativeCode || instr->exit)
+            break;
         if (instr->branch)
             _queue.push(instr);
-        if (instr->exit) {
-            /* Get the next uncompiled branch. */
-            while (!_queue.empty()) {
-                instr = _queue.front();
-                Instruction *branch = fetchInstruction(instr->branchAddress);
-                if (branch != NULL) {
-                    _asmEmitter.setJump(
-                        instr->nativeBranchAddress, branch->nativeCode);
-                } else
-                    break;
-                _queue.pop();
-            }
-            if (_queue.empty())
-                break;
-            _queue.pop();
-            _asmEmitter.setJump(
-                instr->nativeBranchAddress, _asmEmitter.getPtr());
-            pc = instr->branchAddress;
-            prev = NULL;
-            continue;
-        }
-        prev = instr;
+
+        _stack.push(instr);
         pc += Asm::instructions[instr->opcode].bytes;
     }
 
-    // _asmEmitter.dump(start);
-    return fetchInstruction(address);
+    /* Fast flag analysis */
+    u8 requiredFlags = instr->requiredFlags;
+    while (!_stack.empty()) {
+        instr = _stack.top();
+        _stack.pop();
+        instr->requiredFlags = requiredFlags;
+        requiredFlags &= ~Asm::instructions[instr->opcode].wflags;
+        requiredFlags |= ~Asm::instructions[instr->opcode].rflags;
+    }
+
+    /* Compile instruction block. */
+    for (instr = first; ; instr = instr->next) {
+        if (instr->nativeCode) {
+            if (instr != first)
+                _asmEmitter.JMP(instr->nativeCode);
+            break;
+        }
+        instr->compile(_asmEmitter);
+    }
+
+    /* Return block start */
+    return first;
+}
+
+Instruction *InstructionCache::cache(u16 address)
+{
+    if (address < 0x8000)
+        return NULL;
+
+    // _queue.clear();
+    Instruction *block = cacheBlock(address);
+
+    while (!_queue.empty()) {
+        Instruction *branch, *target;
+        branch = _queue.front();
+        _queue.pop();
+        target = cacheBlock(branch->branchAddress);
+        _asmEmitter.setJump(branch->nativeBranchAddress, target->nativeCode);
+    }
+
+    return block;
 }
 
 
