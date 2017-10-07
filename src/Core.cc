@@ -37,6 +37,10 @@ void emulate()
             if (M6502::currentState->irq) {
                 M6502::Eval::triggerIRQ();
             }
+            /* Try jit */
+            M6502::Instruction *instr = M6502::cache.cache(M6502::currentState->regs.pc);
+            if (instr != NULL)
+                instr->run();
             /* Evaluate next instruction */
             u8 opcode = Memory::load(M6502::currentState->regs.pc);
             M6502::Eval::runOpcode(opcode);

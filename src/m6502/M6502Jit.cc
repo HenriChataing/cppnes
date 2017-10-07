@@ -11,6 +11,10 @@
 
 using namespace M6502;
 
+namespace M6502 {
+InstructionCache cache;
+};
+
 Instruction::Instruction(u16 address, u8 opcode, u8 op0, u8 op1)
     : address(address), opcode(opcode), operand0(op0), operand1(op1),
       entry(false), exit(false)
@@ -34,6 +38,14 @@ Instruction::Instruction(u16 address, u8 opcode, u8 op0, u8 op1)
         case JSR_ABS:
         case RTI_IMP:
         case RTS_IMP:
+        case BCC_REL:
+        case BCS_REL:
+        case BEQ_REL:
+        case BMI_REL:
+        case BNE_REL:
+        case BPL_REL:
+        case BVC_REL:
+        case BVS_REL:
             exit = true;
             break;
         default:
@@ -104,6 +116,8 @@ Instruction *InstructionCache::cacheBlock(u16 address)
     Instruction **last = &first;
     // _stack.clear();
 
+    const u8 *ptr = _asmEmitter.getPtr();
+
     while (1) {
         instr = cacheInstruction(pc);
         *last = instr;
@@ -129,13 +143,19 @@ Instruction *InstructionCache::cacheBlock(u16 address)
     }
 
     /* Compile instruction block. */
-    for (instr = first; ; instr = instr->next) {
+    for (instr = first; instr != NULL; instr = instr->next) {
         if (instr->nativeCode) {
             if (instr != first)
                 _asmEmitter.JMP(instr->nativeCode);
             break;
         }
         instr->compile(_asmEmitter);
+        if (instr->exit)
+            break;
+    }
+
+    if (_asmEmitter.getPtr() != ptr) {
+        _asmEmitter.dump(ptr);
     }
 
     /* Return block start */

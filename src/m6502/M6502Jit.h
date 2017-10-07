@@ -74,6 +74,8 @@ private:
     std::stack<Instruction *> _stack;
 };
 
+extern InstructionCache cache;
+
 };
 
 #endif /* _M6502JIT_H_INCLUDED_ */
