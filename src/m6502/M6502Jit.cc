@@ -116,7 +116,7 @@ Instruction *InstructionCache::cacheBlock(u16 address)
     Instruction **last = &first;
     // _stack.clear();
 
-    const u8 *ptr = _asmEmitter.getPtr();
+    // const u8 *ptr = _asmEmitter.getPtr();
 
     while (1) {
         instr = cacheInstruction(pc);
@@ -154,9 +154,9 @@ Instruction *InstructionCache::cacheBlock(u16 address)
             break;
     }
 
-    if (_asmEmitter.getPtr() != ptr) {
-        _asmEmitter.dump(ptr);
-    }
+    // if (_asmEmitter.getPtr() != ptr) {
+    //     _asmEmitter.dump(ptr);
+    // }
 
     /* Return block start */
     return first;
@@ -299,18 +299,18 @@ static inline bool DCP(X86::Emitter &emit, const X86::Reg<u8> &r) {
 
 static inline bool DEC(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.DEC(r);
-    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
+    updateStatusFlags(emit, X86::zero | X86::sign);
     return true;
 }
 
 static inline void DEX(X86::Emitter &emit) {
     emit.DEC(Jit::X);
-    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
+    updateStatusFlags(emit, X86::zero | X86::sign);
 }
 
 static inline void DEY(X86::Emitter &emit) {
     emit.DEC(Jit::Y);
-    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
+    updateStatusFlags(emit, X86::zero | X86::sign);
 }
 
 static inline bool EOR(X86::Emitter &emit, const X86::Reg<u8> &r) {
@@ -812,27 +812,35 @@ static void loadAbsoluteX(
     u16 addr = Memory::loadw(pc + 1);
     emit.MOV(X86::eax, (u32)addr);
     emit.ADD(X86::al, Jit::X);
+    u32 *jmp = emit.JNC();
+    // Implement Oops cycle if the page changes.
+    // Note: the dummy read is important only if the address is linked
+    // to the PPU registers.
+    emit.MOV(X86::ecx, (u32)&currentState->cycles);
+    emit.INC(X86::ecx());
+    emit.PUSH(X86::edx);
+    emit.PUSH(X86::eax);
+    emit.CALL((u8 *)Memory::load);
+    emit.POP(X86::eax);
+    emit.POP(X86::edx);
+    emit.INC(X86::ah);
+    // Back to regular load.
+    emit.setJump(jmp, emit.getPtr());
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::load);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
-    /// TODO check carry bit, if 1 add cycle and repeat load
+    emit.MOV(X86::eax, X86::ecx);
     bool wb = cont(emit, Jit::M);
     if (wb) {
         emit.PUSH(X86::edx);
-        emit.PUSH(X86::ecx);
+        emit.PUSH(X86::eax);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
     }
-
-    // u16 addrX = addr + X;
-    // if ((addr & 0xff00) != (addrX & 0xff00)) {
-    //     (void)Memory::load((addr & 0xff00) | (addrX & 0x00ff));
-    //     currentState->cycles++;
-    // }
 }
 
 static void storeAbsoluteX(
@@ -856,7 +864,7 @@ static void storeAbsoluteX(
 
 /**
  * Implement the Oops cycle.
- * A first fecth is performed at the partially computed address addr + x
+ * A first fecth is performed at the partially computed address addr + y
  * (without wrapping), and repeated if the addition causes the high u8 to
  * change.
  */
@@ -869,27 +877,35 @@ static void loadAbsoluteY(
     u16 addr = Memory::loadw(pc + 1);
     emit.MOV(X86::eax, (u32)addr);
     emit.ADD(X86::al, Jit::Y);
+    u32 *jmp = emit.JNC();
+    // Implement Oops cycle if the page changes.
+    // Note: the dummy read is important only if the address is linked
+    // to the PPU registers.
+    emit.MOV(X86::ecx, (u32)&currentState->cycles);
+    emit.INC(X86::ecx());
+    emit.PUSH(X86::edx);
+    emit.PUSH(X86::eax);
+    emit.CALL((u8 *)Memory::load);
+    emit.POP(X86::eax);
+    emit.POP(X86::edx);
+    emit.INC(X86::ah);
+    // Back to regular load.
+    emit.setJump(jmp, emit.getPtr());
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::load);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
-    /// TODO check carry bit, if 1 add cycle and repeat load
+    emit.MOV(X86::eax, X86::ecx);
     bool wb = cont(emit, Jit::M);
     if (wb) {
         emit.PUSH(X86::edx);
-        emit.PUSH(X86::ecx);
+        emit.PUSH(X86::eax);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
     }
-
-    // u16 addrY = addr + Y;
-    // if ((addr & 0xff00) != (addrY & 0xff00)) {
-    //     (void)Memory::load((addr & 0xff00) | (addrY & 0x00ff));
-    //     currentState->cycles++;
-    // }
 }
 
 static void storeAbsoluteY(
@@ -983,30 +999,35 @@ static void loadIndirectIndexed(
     emit.INC(X86::al);
     emit.MOV(X86::ch, X86::eax());
     emit.ADD(X86::cl, Jit::Y);
-    /// TODO check carry bit, if 1 add cycle and repeat load
+    u32 *jmp = emit.JNC();
+    // Implement Oops cycle if the page changes.
+    // Note: the dummy read is important only if the address is linked
+    // to the PPU registers.
+    emit.MOV(X86::eax, (u32)&currentState->cycles);
+    emit.INC(X86::eax());
+    emit.PUSH(X86::edx);
+    emit.PUSH(X86::ecx);
+    emit.CALL((u8 *)Memory::load);
+    emit.POP(X86::ecx);
+    emit.POP(X86::edx);
+    emit.INC(X86::ch);
+    // Back to regular load.
+    emit.setJump(jmp, emit.getPtr());
     emit.PUSH(X86::edx);
     emit.PUSH(X86::ecx);
     emit.CALL((u8 *)Memory::load);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
+    emit.MOV(X86::eax, X86::ecx);
     bool wb = cont(emit, Jit::M);
     if (wb) {
         emit.PUSH(X86::edx);
-        emit.PUSH(X86::ecx);
+        emit.PUSH(X86::eax);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
     }
-
-    // u16 addr = Memory::load(PC + 1), addrY;
-    // addr = Memory::loadzw(addr);
-    // addrY = addr + Y;
-    // if ((addr & 0xff00) != (addrY & 0xff00)) {
-    //     (void)Memory::load((addr & 0xff00) | (addrY & 0x00ff));
-    //     currentState->cycles++;
-    // }
-    // return Memory::load(addrY);
 }
 
 /**
@@ -1172,7 +1193,14 @@ static u16 getIndirect(void) {
 void Instruction::compile(X86::Emitter &emit)
 {
     nativeCode = emit.getPtr();
-    exit = false;
+
+    /* Exit instruction. */
+    if (exit) {
+        emit.MOV(X86::eax, address);
+        emit.POPF();
+        emit.RETN();
+        return;
+    }
 
     /* Check jamming instructions. */
     if (Asm::instructions[opcode].jam) {
@@ -1185,18 +1213,6 @@ void Instruction::compile(X86::Emitter &emit)
     /* Interpret instruction. */
     switch (opcode)
     {
-        case BRK_IMP:
-        case JMP_ABS:
-        case JMP_IND:
-        case JSR_ABS:
-        case RTI_IMP:
-        case RTS_IMP:
-            exit = true;
-            emit.MOV(X86::eax, address);
-            emit.POPF();
-            emit.RETN();
-            break;
-
         CASE_BR(BCC, emit.JC);
         CASE_BR(BCS, emit.JNC);
         CASE_BR(BEQ, emit.JNZ);
