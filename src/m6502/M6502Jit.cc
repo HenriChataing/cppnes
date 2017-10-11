@@ -423,6 +423,7 @@ static inline bool NOP(X86::Emitter &emit, const X86::Reg<u8> &r) {
 
 static inline bool BIT(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.POP(X86::ecx);
+    emit.PUSH(X86::eax); // Save eax
     emit.AND(X86::ecx, 0xfffff73f); // Clear Zero,Sign,Overflow flags.
     emit.MOV(X86::al, r);
     emit.AND(X86::al, 0x80);
@@ -436,6 +437,7 @@ static inline bool BIT(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.POP(X86::eax);
     emit.AND(X86::al, 0x40); // Keep zero flag.
     emit.OR(X86::cl, X86::al);
+    emit.POP(X86::eax); // restore eax
     emit.PUSH(X86::ecx);
     return false;
 }
@@ -532,6 +534,7 @@ static inline void PLP(X86::Emitter &emit) {
     emit.MOV(X86::ecx, X86::eax());
     emit.INC(X86::cl); // Will wrap on stack underflow
     emit.MOV(Jit::M, X86::ecx());
+    emit.AND(Jit::M, ~0x30); // Mask virtual flags
     emit.MOV(X86::eax(), X86::ecx);
     /* Update Interrupt, Decimal, etc. flags in currentState memory. */
     emit.MOV(X86::eax, (u32)p);
@@ -947,10 +950,11 @@ static void loadIndexedIndirect(
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
+    emit.MOV(X86::eax, X86::ecx);
     bool wb = cont(emit, Jit::M);
     if (wb) {
         emit.PUSH(X86::edx);
-        emit.PUSH(X86::ecx);
+        emit.PUSH(X86::eax);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
