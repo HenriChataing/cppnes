@@ -66,6 +66,9 @@ void emulate()
         std::cerr << "Fatal error (core): " << exc.what();
         std::cerr << ": " << (int)exc.opcode << std::endl;
         Events::quit();
+    } catch (const char *msg) {
+        std::cerr << "Fatal error (core): " << msg << std::endl;
+        Events::quit();
     } catch (const std::exception &exc) {
         std::cerr << "Fatal error (core): " << exc.what() << std::endl;
         Events::quit();

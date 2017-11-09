@@ -3,6 +3,8 @@
 #include <iostream>
 #include <iomanip>
 
+#include <sys/mman.h>
+
 #include "Rom.h"
 #include "exception.h"
 

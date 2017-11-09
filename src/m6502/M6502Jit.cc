@@ -293,7 +293,8 @@ static inline bool CPY(X86::Emitter &emit, const X86::Reg<u8> &r) {
 
 /** Unofficial opcode, composition of DEC and CMP. */
 static inline bool DCP(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    throw "DCP unimplemented";
+    emit.DEC(r);
+    compare(emit, Jit::A, r);
     return true;
 }
 
@@ -674,6 +675,7 @@ static void loadImmediate(
     X86::Emitter &emit,
     u16 pc,
     Operation cont,
+    bool wb,
     const X86::Reg<u8> &r)
 {
     emit.MOV(r, Memory::load(pc + 1));
@@ -684,13 +686,14 @@ static void loadZeroPage(
     X86::Emitter &emit,
     u16 pc,
     Operation cont,
+    bool wb,
     const X86::Reg<u8> &r)
 {
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.MOV(r, X86::eax());
-    bool wb = cont(emit, r);
+    cont(emit, r);
     if (wb)
         emit.MOV(X86::eax(), r);
 }
@@ -710,6 +713,7 @@ static void loadZeroPageX(
     X86::Emitter &emit,
     u16 pc,
     Operation cont,
+    bool wb,
     const X86::Reg<u8> &r)
 {
     u8 *zp = Memory::ram;
@@ -717,7 +721,7 @@ static void loadZeroPageX(
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.ADD(X86::al, Jit::X);
     emit.MOV(r, X86::eax());
-    bool wb = cont(emit, r);
+    cont(emit, r);
     if (wb)
         emit.MOV(X86::eax(), r);
 }
@@ -738,6 +742,7 @@ static void loadZeroPageY(
     X86::Emitter &emit,
     u16 pc,
     Operation cont,
+    bool wb,
     const X86::Reg<u8> &r)
 {
     u8 *zp = Memory::ram;
@@ -745,7 +750,7 @@ static void loadZeroPageY(
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.ADD(X86::al, Jit::Y);
     emit.MOV(r, X86::eax());
-    bool wb = cont(emit, r);
+    cont(emit, r);
     if (wb)
         emit.MOV(X86::eax(), r);
 }
@@ -766,6 +771,7 @@ static void loadAbsolute(
     X86::Emitter &emit,
     u16 pc,
     Operation cont,
+    bool wb,
     const X86::Reg<u8> &r)
 {
     u16 addr = Memory::loadw(pc + 1);
@@ -775,7 +781,7 @@ static void loadAbsolute(
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
-    bool wb = cont(emit, Jit::M);
+    cont(emit, Jit::M);
     if (wb) {
         emit.PUSH(X86::edx);
         emit.PUSH((u32)addr);
@@ -810,6 +816,7 @@ static void loadAbsoluteX(
     X86::Emitter &emit,
     u16 pc,
     Operation cont,
+    bool wb,
     const X86::Reg<u8> &r)
 {
     u16 addr = Memory::loadw(pc + 1);
@@ -836,7 +843,7 @@ static void loadAbsoluteX(
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
     emit.MOV(X86::eax, X86::ecx);
-    bool wb = cont(emit, Jit::M);
+    cont(emit, Jit::M);
     if (wb) {
         emit.PUSH(X86::edx);
         emit.PUSH(X86::eax);
@@ -875,6 +882,7 @@ static void loadAbsoluteY(
     X86::Emitter &emit,
     u16 pc,
     Operation cont,
+    bool wb,
     const X86::Reg<u8> &r)
 {
     u16 addr = Memory::loadw(pc + 1);
@@ -901,7 +909,7 @@ static void loadAbsoluteY(
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
     emit.MOV(X86::eax, X86::ecx);
-    bool wb = cont(emit, Jit::M);
+    cont(emit, Jit::M);
     if (wb) {
         emit.PUSH(X86::edx);
         emit.PUSH(X86::eax);
@@ -934,6 +942,7 @@ static void loadIndexedIndirect(
     X86::Emitter &emit,
     u16 pc,
     Operation cont,
+    bool wb,
     const X86::Reg<u8> &r)
 {
     u8 *zp = Memory::ram;
@@ -951,7 +960,7 @@ static void loadIndexedIndirect(
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
     emit.MOV(X86::eax, X86::ecx);
-    bool wb = cont(emit, Jit::M);
+    cont(emit, Jit::M);
     if (wb) {
         emit.PUSH(X86::edx);
         emit.PUSH(X86::eax);
@@ -993,6 +1002,7 @@ static void loadIndirectIndexed(
     X86::Emitter &emit,
     u16 pc,
     Operation cont,
+    bool wb,
     const X86::Reg<u8> &r)
 {
     u8 *zp = Memory::ram;
@@ -1023,8 +1033,9 @@ static void loadIndirectIndexed(
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
-    emit.MOV(X86::eax, X86::ecx);
-    bool wb = cont(emit, Jit::M);
+    if (wb)
+        emit.MOV(X86::eax, X86::ecx); // Save write back address to eax
+    cont(emit, Jit::M);
     if (wb) {
         emit.PUSH(X86::edx);
         emit.PUSH(X86::eax);
@@ -1089,15 +1100,15 @@ static u16 getIndirect(void) {
 }
 #endif
 
-#define CASE_LD_MEM(op, load, ...)                                             \
-    CASE_LD_MEM_GEN(op, load, __VA_ARGS__, Jit::M)
+#define CASE_LD_MEM(op, load, wb, ...)                                         \
+    CASE_LD_MEM_GEN(op, load, wb, __VA_ARGS__, Jit::M)
 
 /**
  * Generate the code for an instruction fetching a value from memory.
  */
-#define CASE_LD_MEM_GEN(op, load, fun, r, ...)                                 \
+#define CASE_LD_MEM_GEN(op, load, wb, fun, r, ...)                             \
     case op: {                                                                 \
-        load(emit, address, fun, r);                                           \
+        load(emit, address, fun, wb, r);                                       \
         break;                                                                 \
     }
 
@@ -1143,22 +1154,22 @@ static u16 getIndirect(void) {
 #define CASE_NN(op, fun) CASE_NN_EXP(op##_IMP, fun(emit))
 #define CASE_NN_UO(op, fun) CASE_NN_EXP(op, fun(emit))
 
-#define CASE_LD_IMM(op, ...)  CASE_LD_MEM(op##_IMM, loadImmediate, __VA_ARGS__)
-#define CASE_LD_ZPG(op, ...)  CASE_LD_MEM(op##_ZPG, loadZeroPage, __VA_ARGS__)
-#define CASE_LD_ZPX(op, ...)  CASE_LD_MEM(op##_ZPX, loadZeroPageX, __VA_ARGS__)
-#define CASE_LD_ZPY(op, ...)  CASE_LD_MEM(op##_ZPY, loadZeroPageY, __VA_ARGS__)
-#define CASE_LD_ABS(op, ...)  CASE_LD_MEM(op##_ABS, loadAbsolute, __VA_ARGS__)
-#define CASE_LD_ABX(op, ...)  CASE_LD_MEM(op##_ABX, loadAbsoluteX, __VA_ARGS__)
-#define CASE_LD_ABY(op, ...)  CASE_LD_MEM(op##_ABY, loadAbsoluteY, __VA_ARGS__)
-#define CASE_LD_IND(op, ...)  CASE_LD_MEM(op##_IND, loadIndirect, __VA_ARGS__)
-#define CASE_LD_INX(op, ...)  CASE_LD_MEM(op##_INX, loadIndexedIndirect, __VA_ARGS__)
-#define CASE_LD_INY(op, ...)  CASE_LD_MEM(op##_INY, loadIndirectIndexed, __VA_ARGS__)
+#define CASE_LD_IMM(op, ...)  CASE_LD_MEM(op##_IMM, loadImmediate, false, __VA_ARGS__)
+#define CASE_LD_ZPG(op, ...)  CASE_LD_MEM(op##_ZPG, loadZeroPage, false, __VA_ARGS__)
+#define CASE_LD_ZPX(op, ...)  CASE_LD_MEM(op##_ZPX, loadZeroPageX, false, __VA_ARGS__)
+#define CASE_LD_ZPY(op, ...)  CASE_LD_MEM(op##_ZPY, loadZeroPageY, false, __VA_ARGS__)
+#define CASE_LD_ABS(op, ...)  CASE_LD_MEM(op##_ABS, loadAbsolute, false, __VA_ARGS__)
+#define CASE_LD_ABX(op, ...)  CASE_LD_MEM(op##_ABX, loadAbsoluteX, false, __VA_ARGS__)
+#define CASE_LD_ABY(op, ...)  CASE_LD_MEM(op##_ABY, loadAbsoluteY, false, __VA_ARGS__)
+#define CASE_LD_IND(op, ...)  CASE_LD_MEM(op##_IND, loadIndirect, false, __VA_ARGS__)
+#define CASE_LD_INX(op, ...)  CASE_LD_MEM(op##_INX, loadIndexedIndirect, false, __VA_ARGS__)
+#define CASE_LD_INY(op, ...)  CASE_LD_MEM(op##_INY, loadIndirectIndexed, false, __VA_ARGS__)
 
-#define CASE_LD_IMM_UO(op, ...)  CASE_LD_MEM(op, loadImmediate, __VA_ARGS__)
-#define CASE_LD_ZPG_UO(op, ...)  CASE_LD_MEM(op, loadZeroPage, __VA_ARGS__)
-#define CASE_LD_ZPX_UO(op, ...)  CASE_LD_MEM(op, loadZeroPageX, __VA_ARGS__)
-#define CASE_LD_ABS_UO(op, ...)  CASE_LD_MEM(op, loadAbsolute, __VA_ARGS__)
-#define CASE_LD_ABX_UO(op, ...)  CASE_LD_MEM(op, loadAbsoluteX, __VA_ARGS__)
+#define CASE_LD_IMM_UO(op, ...)  CASE_LD_MEM(op, loadImmediate, false, __VA_ARGS__)
+#define CASE_LD_ZPG_UO(op, ...)  CASE_LD_MEM(op, loadZeroPage, false, __VA_ARGS__)
+#define CASE_LD_ZPX_UO(op, ...)  CASE_LD_MEM(op, loadZeroPageX, false, __VA_ARGS__)
+#define CASE_LD_ABS_UO(op, ...)  CASE_LD_MEM(op, loadAbsolute, false, __VA_ARGS__)
+#define CASE_LD_ABX_UO(op, ...)  CASE_LD_MEM(op, loadAbsoluteX, false, __VA_ARGS__)
 
 #define CASE_ST_ZPG(op, reg)  CASE_ST_MEM(op##_ZPG, reg, storeZeroPage)
 #define CASE_ST_ZPX(op, reg)  CASE_ST_MEM(op##_ZPX, reg, storeZeroPageX)
@@ -1170,13 +1181,13 @@ static u16 getIndirect(void) {
 #define CASE_ST_INY(op, reg)  CASE_ST_MEM(op##_INY, reg, storeIndirectIndexed)
 
 #define CASE_UP_ACC(op, fun)  CASE_UP_REG(op##_ACC, fun, Jit::A)
-#define CASE_UP_ZPG(op, fun)  CASE_LD_MEM(op##_ZPG, loadZeroPage, fun)
-#define CASE_UP_ZPX(op, fun)  CASE_LD_MEM(op##_ZPX, loadZeroPageX, fun)
-#define CASE_UP_ABS(op, fun)  CASE_LD_MEM(op##_ABS, loadAbsolute, fun)
-#define CASE_UP_ABX(op, fun)  CASE_LD_MEM(op##_ABX, loadAbsoluteX, fun)
-#define CASE_UP_ABY(op, fun)  CASE_LD_MEM(op##_ABY, loadAbsoluteY, fun)
-#define CASE_UP_INX(op, fun)  CASE_LD_MEM(op##_INX, loadIndexedIndirect, fun)
-#define CASE_UP_INY(op, fun)  CASE_LD_MEM(op##_INY, loadIndirectIndexed, fun)
+#define CASE_UP_ZPG(op, fun)  CASE_LD_MEM(op##_ZPG, loadZeroPage, true, fun)
+#define CASE_UP_ZPX(op, fun)  CASE_LD_MEM(op##_ZPX, loadZeroPageX, true, fun)
+#define CASE_UP_ABS(op, fun)  CASE_LD_MEM(op##_ABS, loadAbsolute, true, fun)
+#define CASE_UP_ABX(op, fun)  CASE_LD_MEM(op##_ABX, loadAbsoluteX, true, fun)
+#define CASE_UP_ABY(op, fun)  CASE_LD_MEM(op##_ABY, loadAbsoluteY, true, fun)
+#define CASE_UP_INX(op, fun)  CASE_LD_MEM(op##_INX, loadIndexedIndirect, true, fun)
+#define CASE_UP_INY(op, fun)  CASE_LD_MEM(op##_INY, loadIndirectIndexed, true, fun)
 
 /** Create a banch instruction with the given condition. */
 #define CASE_BR(op, oppcond)                                                   \
