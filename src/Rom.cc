@@ -1,6 +1,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <stdexcept>
 #include <iomanip>
 
 #include <sys/mman.h>

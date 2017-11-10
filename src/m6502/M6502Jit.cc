@@ -338,7 +338,12 @@ static inline void INY(X86::Emitter &emit) {
 
 /** Unofficial opcode, composition of INC and SBC. */
 static inline bool ISB(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    throw "ISB unimplemented";
+    emit.INC(r);
+    emit.POPF();
+    emit.CMC();
+    emit.SBB(Jit::A, r);
+    emit.CMC();
+    emit.PUSHF();
     return true;
 }
 
@@ -826,8 +831,10 @@ static void loadAbsoluteX(
     // Implement Oops cycle if the page changes.
     // Note: the dummy read is important only if the address is linked
     // to the PPU registers.
-    emit.MOV(X86::ecx, (u32)&currentState->cycles);
-    emit.INC(X86::ecx());
+    if (!wb) {
+        emit.MOV(X86::ecx, (u32)&currentState->cycles);
+        emit.INC(X86::ecx());
+    }
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::load);
@@ -892,8 +899,10 @@ static void loadAbsoluteY(
     // Implement Oops cycle if the page changes.
     // Note: the dummy read is important only if the address is linked
     // to the PPU registers.
-    emit.MOV(X86::ecx, (u32)&currentState->cycles);
-    emit.INC(X86::ecx());
+    if (!wb) {
+        emit.MOV(X86::ecx, (u32)&currentState->cycles);
+        emit.INC(X86::ecx());
+    }
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::load);
@@ -1017,8 +1026,10 @@ static void loadIndirectIndexed(
     // Implement Oops cycle if the page changes.
     // Note: the dummy read is important only if the address is linked
     // to the PPU registers.
-    emit.MOV(X86::eax, (u32)&currentState->cycles);
-    emit.INC(X86::eax());
+    if (!wb) {
+        emit.MOV(X86::eax, (u32)&currentState->cycles);
+        emit.INC(X86::eax());
+    }
     emit.PUSH(X86::edx);
     emit.PUSH(X86::ecx);
     emit.CALL((u8 *)Memory::load);
@@ -1535,9 +1546,8 @@ void Instruction::compile(X86::Emitter &emit)
         CASE_LD_IMM(AXS, AXS);
 
         default:
-            // error("unsupported instruction, stopping execution\n");
-            // error("  PC $%04x\n", cpu.regs.pc);
-            // error("  opcode %02x\n", opcode);
+            std::cerr << "unsupported instruction, stopping execution" << std::endl;
+            std::cerr << "  opcode " << (int)opcode << std::endl;
             throw "Unsupported instruction";
     }
 
