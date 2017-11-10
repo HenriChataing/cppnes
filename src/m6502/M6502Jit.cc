@@ -361,7 +361,11 @@ static inline bool ORA(X86::Emitter &emit, const X86::Reg<u8> &r) {
 
 /** Unofficial opcode, composition of ROL and AND. */
 static inline bool RLA(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    throw "RLA unimplemented";
+    restoreStatusFlags(emit);
+    emit.RCL(r);
+    updateStatusFlags(emit, X86::carry);
+    emit.AND(Jit::A, r);
+    updateStatusFlags(emit, X86::zero | X86::sign);
     return true;
 }
 
@@ -381,8 +385,15 @@ static inline bool ROR(X86::Emitter &emit, const X86::Reg<u8> &r) {
     return true;
 }
 
+/** Unofficial opcode, composition of ROR and ADC. */
 static inline bool RRA(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    throw "RRA unimplemented";
+    restoreStatusFlags(emit);
+    emit.RCR(r);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
+    testZeroSign(emit, r);
+    emit.POPF();
+    emit.ADC(Jit::A, r);
+    emit.PUSHF();
     return true;
 }
 
@@ -395,13 +406,21 @@ static inline bool SBC(X86::Emitter &emit, const X86::Reg<u8> &r) {
     return false;
 }
 
+/** Unofficial opcode, composition of ASL and ORA. */
 static inline bool SLO(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    throw "SLO unimplemented";
+    emit.SHL(r);
+    updateStatusFlags(emit, X86::carry);
+    emit.OR(Jit::A, r);
+    updateStatusFlags(emit, X86::zero | X86::sign);
     return true;
 }
 
+/** Unofficial opcode, composition of LSR and EOR. */
 static inline bool SRE(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    throw "SRE unimplemented";
+    emit.SHR(r);
+    updateStatusFlags(emit, X86::carry);
+    emit.XOR(Jit::A, r);
+    updateStatusFlags(emit, X86::zero | X86::sign);
     return true;
 }
 
