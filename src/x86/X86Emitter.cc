@@ -39,50 +39,14 @@ Reg<u8> bh(7);
 
 };
 
-Emitter::Emitter(size_t codeSize)
+Emitter::Emitter(CodeBuffer *buffer)
+:
+    _buffer(buffer)
 {
-    _codeBuffer = NULL;
-    _codeSize = ((codeSize + 0xfff) / 0x1000) * 0x1000;
-    _codeLength = 0;
-    int r;
-
-#if 0
-    _codeBuffer = (u8 *)mmap(NULL, _codeSize,
-        PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
-    if (_codeBuffer == MAP_FAILED) {
-        std::cerr << "Cannot allocate mmap memory" << std::endl;
-        throw "Emitter mmap failure";
-    }
-#else
-    /* Allocate page aligned code buffer. */
-    r = posix_memalign((void **)&_codeBuffer, 0x1000, _codeSize);
-    if (r != 0) {
-        std::cerr << "Cannot allocate page aligned memory ";
-        if (r == EINVAL)
-            std::cerr << "(Invalid alignmnt)";
-        if (r == ENOMEM)
-            std::cerr << "(Out of memory)";
-        std::cerr << std::endl;
-        throw "Emitter allocation failure";
-    }
-
-    /*
-     * Change access permissions to code buffer to enable executing
-     * code inside.
-     */
-    r = mprotect(_codeBuffer, _codeSize,
-        PROT_WRITE | PROT_READ | PROT_EXEC);
-    if (r < 0) {
-        std::cerr << "Cannot change memory permissions for buffer ";
-        std::cerr << _codeBuffer << " (" << strerror(errno) << ")" << std::endl;
-        throw "Emitter mprotect failure";
-    }
-#endif
 }
 
 Emitter::~Emitter()
 {
-    delete _codeBuffer;
 }
 
 /**
@@ -102,9 +66,9 @@ u32 *Emitter::jumpCond(u8 ops, u8 opl, const u8 *loc)
 {
     if (loc == NULL) {
         put(0x0f); put(opl); put((u32)0);
-        return (u32 *)(_codeBuffer + _codeLength - 4);
+        return (u32 *)(_buffer->getPtr() - 4);
     }
-    ptrdiff_t rel = loc - (_codeBuffer + _codeLength + 2);
+    ptrdiff_t rel = loc - (_buffer->getPtr() + 2);
     i8 rel8 = rel;
     if ((ptrdiff_t)rel8 == rel) {
         put(ops); put(rel8);
@@ -131,9 +95,9 @@ u32 *Emitter::jumpAbs(u8 ops, u8 opl, const u8 *loc)
 {
     if (loc == NULL) {
         put(opl); put((u32)0);
-        return (u32 *)(_codeBuffer + _codeLength - 4);
+        return (u32 *)(_buffer->getPtr() - 4);
     }
-    ptrdiff_t rel = loc - (_codeBuffer + _codeLength + 2);
+    ptrdiff_t rel = loc - (_buffer->getPtr() + 2);
     i8 rel8 = rel;
     if ((ptrdiff_t)rel8 == rel) {
         put(ops); put(rel8);
@@ -148,35 +112,14 @@ u32 *Emitter::jumpAbs(u8 opl, const u8 *loc)
 {
     if (loc == NULL) {
         put(opl); put((u32)0);
-        return (u32 *)(_codeBuffer + _codeLength - 4);
+        return (u32 *)(_buffer->getPtr() - 4);
     }
-    ptrdiff_t rel = loc - (_codeBuffer + _codeLength + 5);
+    ptrdiff_t rel = loc - (_buffer->getPtr() + 5);
     put(opl); put((u32)rel);
     return NULL;
 }
 
-void Emitter::dump() const
-{
-    std::cout << std::hex << std::setfill('0');
-    std::cout << "== " << (uintptr_t)_codeBuffer << std::endl;
-    for (uint i = 0; i < _codeLength; i++) {
-        if (i && !(i % 32))
-            std::cout << std::endl;
-        std::cout << " " << std::setfill('0') << std::setw(2);
-        std::cout << (uint)_codeBuffer[i];
-    }
-    std::cout << std::endl;
-}
-
 void Emitter::dump(const u8 *start) const
 {
-    std::cout << std::hex << std::setfill('0');
-    std::cout << "== " << (uintptr_t)start << std::endl;
-    u8 *end = _codeBuffer + _codeLength;
-    for (uint i = 0; start < end; start++, i++) {
-        if (i && !(i % 32))
-            std::cout << std::endl;
-        std::cout << " " << std::setw(2) << (uint)start[0];
-    }
-    std::cout << std::endl;
+    _buffer->dump(start);
 }

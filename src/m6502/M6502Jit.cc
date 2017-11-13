@@ -12,7 +12,7 @@
 using namespace M6502;
 
 namespace M6502 {
-InstructionCache cache;
+InstructionCache cache(new CodeBuffer());
 };
 
 Instruction::Instruction(u16 address, u8 opcode, u8 op0, u8 op1)
@@ -72,8 +72,9 @@ Instruction::Instruction(u16 address, u8 opcode, u8 op0, u8 op1)
  *      6502 stack operations
  */
 
-InstructionCache::InstructionCache()
-    : _asmEmitter(0x100000)
+InstructionCache::InstructionCache(CodeBuffer *buffer)
+:
+    _asmEmitter(buffer)
 {
     _cacheSize = 0x8000;
     _cache = new Instruction *[0x8000];

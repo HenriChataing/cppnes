@@ -1,28 +1,3 @@
-/*
- * Copyright (c) 2017-2017 Prove & Run S.A.S
- * All Rights Reserved.
- *
- * This software is the confidential and proprietary information of
- * Prove & Run S.A.S ("Confidential Information"). You shall not
- * disclose such Confidential Information and shall use it only in
- * accordance with the terms of the license agreement you entered
- * into with Prove & Run S.A.S
- *
- * PROVE & RUN S.A.S MAKES NO REPRESENTATIONS OR WARRANTIES ABOUT THE
- * SUITABILITY OF THE SOFTWARE, EITHER EXPRESS OR IMPLIED, INCLUDING
- * BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT. PROVE & RUN S.A.S SHALL
- * NOT BE LIABLE FOR ANY DAMAGES SUFFERED BY LICENSEE AS A RESULT OF USING,
- * MODIFYING OR DISTRIBUTING THIS SOFTWARE OR ITS DERIVATIVES.
- */
-/**
- * @file
- * @brief
- * @author Henri Chataing
- * @date July 04th, 2017 (creation)
- * @copyright (c) 2017-2017, Prove & Run and/or its affiliates.
- *   All rights reserved.
- */
 
 #ifndef _EMITTER_H_INCLUDED_
 #define _EMITTER_H_INCLUDED_
@@ -31,7 +6,7 @@
 #include <cstddef>
 #include <cstring>
 
-#include "type.h"
+#include "CodeBuffer.h"
 
 namespace X86 {
 
@@ -114,13 +89,12 @@ static const u32 overflow = 1l << 11;
 class Emitter
 {
 public:
-    Emitter(size_t codeSize);
+    Emitter(CodeBuffer *buffer);
     ~Emitter();
 
-    const u8 *getPtr() const { return _codeBuffer + _codeLength; }
-    size_t getSize() const { return _codeLength; }
-    void dump() const;
-    void dump(const u8 *start) const;
+    const u8 *getPtr() const { return _buffer->getPtr(); }
+    size_t getSize() const { return _buffer->getLength(); }
+    void dump(const u8 *start = NULL) const;
 
     u32 *CALL(const u8 *loc = NULL) { return jumpAbs(0xe8, loc); }
     void CALL(const Reg<u32> &r) { put(0xff); put(r.code | 0xd0); }
@@ -328,9 +302,7 @@ public:
     void RCR(const Mem &m, u8 s) { put(0xc1); put(0x18 | m.mode); put(m); put(s); }
 
 private:
-    u8 *_codeBuffer;
-    size_t _codeLength;
-    size_t _codeSize;
+    CodeBuffer *_buffer;
 
     u32 *jumpCond(u8 ops, u8 opl, const u8 *loc);
     u32 *jumpAbs(u8 ops, u8 opl, const u8 *loc);
@@ -396,19 +368,16 @@ private:
     }
 
     inline void put(u8 b) {
-        _codeBuffer[_codeLength++] = b;
+        _buffer->writeb(b);
     }
     inline void put(u32 w) {
-        memcpy(&_codeBuffer[_codeLength], &w, 4);
-        _codeLength += 4;
+        _buffer->writew(w);
     }
     inline void put(const Mem &m) {
         if (m.size == 1)
-            _codeBuffer[_codeLength++] = m.disp;
-        else if (m.size == 4) {
-            memcpy(&_codeBuffer[_codeLength], &m.disp, 4);
-            _codeLength += 4;
-        }
+            _buffer->writeb(m.disp);
+        else if (m.size == 4)
+            _buffer->writew(m.disp);
     }
     /*
      * u32 constants are usually typed, calls to this method result from

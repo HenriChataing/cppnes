@@ -55,7 +55,7 @@ private:
 class InstructionCache
 {
 public:
-    InstructionCache();
+    InstructionCache(CodeBuffer *buffer);
     ~InstructionCache();
 
     Instruction *fetchInstruction(u16 address);

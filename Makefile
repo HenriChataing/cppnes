@@ -19,7 +19,7 @@ SRC    += m6502/M6502State.cc m6502/M6502Eval.cc m6502/M6502Asm.cc m6502/M6502Ji
 SRC    += n2C02/N2C02State.cc
 # SRC    += rp2A03/RP2A03State.cc
 SRC    += mappers/nrom.cc mappers/mmc1.cc mappers/cnrom.cc mappers/mmc3.cc
-SRC    += Memory.cc Events.cc Joypad.cc Rom.cc Core.cc main.cc
+SRC    += Memory.cc CodeBuffer.cc Events.cc Joypad.cc Rom.cc Core.cc main.cc
 
 OBJS   := $(patsubst %.cc,$(OBJDIR)/%.o, $(SRC))
 DEPS   := $(patsubst %.cc,$(OBJDIR)/%.d, $(SRC))
