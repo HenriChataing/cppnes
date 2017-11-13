@@ -20,7 +20,7 @@ State::State()
     regs.y = 0;
     regs.p = 0x24;
     stack = Memory::ram + 0x1fd;
-    cycles = 0LL;
+    cycles = 0;
     nmi = false;
     irq = false;
 }
@@ -38,7 +38,7 @@ void State::clear()
     regs.y = 0;
     regs.p = 0x24;
     stack = Memory::ram + 0x1fd;
-    cycles = 0LL;
+    cycles = 0;
     nmi = false;
     irq = false;
 }

@@ -114,6 +114,8 @@ public:
     State();
     ~State();
 
+    void clear();
+
     /*
      * Current scanline (0-261 inclusive)
      */
@@ -122,6 +124,11 @@ public:
      * Current scanline cycle (0-340 inclusive)
      */
     unsigned int cycle;
+    /*
+     * CPU cycle count at the last time the PPU was updated.
+     */
+    unsigned long sync;
+
     /*
      * The PPU has an internal data bus that it uses for communication with the
      * CPU. This bus behaves as an 8-bit dynamic latch due to capacitance of
@@ -165,6 +172,7 @@ void setScanlineCallback(std::function<void(int, int)> callback);
 int init();
 void quit();
 void dot();
+void sync();
 
 };
 

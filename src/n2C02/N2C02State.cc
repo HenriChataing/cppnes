@@ -174,11 +174,21 @@ State::State()
     ctrl.i = 0x1;
 }
 
+void State::clear()
+{
+    scanline = 0;
+    cycle = 0;
+    sync = 0;
+}
+
 /**
  * Read from one of the PPU io registers.
  */
 u8 State::readRegister(u16 addr)
 {
+    /* Synchronize with CPU */
+    N2C02::sync();
+
     u8 val = 0x0;
 
     switch (addr & 0x7)
@@ -262,6 +272,8 @@ u8 State::readRegister(u16 addr)
  */
 void State::writeRegister(u16 addr, u8 val)
 {
+    /* Synchronize with CPU */
+    N2C02::sync();
     /* Set the value on the internal data bus. */
     bus = val;
     /* Analyse the write effects. */
@@ -348,6 +360,8 @@ void State::writeRegister(u16 addr, u8 val)
  */
 void State::dmaTransfer(u8 val)
 {
+    /* Synchronize with CPU */
+    N2C02::sync();
     oam.raw[currentState->oamaddr++] = val;
 }
 
@@ -1162,6 +1176,19 @@ next:
         currentState->scanline++;
         currentState->cycle = 0;
     }
+}
+
+void sync()
+{
+    unsigned long cpu = M6502::currentState->cycles;
+    unsigned long diff = cpu - currentState->sync;
+    while (diff > 0) {
+        N2C02::dot();
+        N2C02::dot();
+        N2C02::dot();
+        diff--;
+    }
+    currentState->sync = cpu;
 }
 
 /**

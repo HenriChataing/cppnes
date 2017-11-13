@@ -20,16 +20,16 @@ namespace Core
 {
 
 /**
- * Emulation rountine.
+ * Emulation routine.
  */
 void emulate()
 {
     M6502::currentState->clear();
     M6502::currentState->reset();
+    N2C02::currentState->clear();
 
     try {
         while (true) {
-            uint cycles = M6502::currentState->cycles;
             /* Catch interrupts */
             if (M6502::currentState->nmi) {
                 M6502::Eval::triggerNMI();
@@ -44,19 +44,12 @@ void emulate()
             /* Evaluate next instruction */
             u8 opcode = Memory::load(M6502::currentState->regs.pc);
             M6502::Eval::runOpcode(opcode);
-            cycles = M6502::currentState->cycles - cycles;
-            while (cycles > 0) {
-                N2C02::dot();
-                N2C02::dot();
-                N2C02::dot();
-                cycles--;
+            N2C02::sync();
+            while (Events::isPaused() && !Events::isQuit()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             if (Events::isQuit())
                 break;
-            while (Events::isPaused()) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-
         }
     } catch (const UnsupportedInstruction &exc) {
         std::cerr << "Fatal error (core): " << exc.what();
