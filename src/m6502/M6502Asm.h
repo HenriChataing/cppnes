@@ -18,6 +18,7 @@ static const u8 interrupt   = 1 << 2;
 static const u8 decimal     = 1 << 3;
 static const u8 overflow    = 1 << 6;
 static const u8 negative    = 1 << 7;
+static const u8 all         = 0xff;
 
 struct metadata {
     unsigned int bytes;

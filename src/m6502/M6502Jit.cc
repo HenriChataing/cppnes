@@ -134,13 +134,17 @@ Instruction *InstructionCache::cacheBlock(u16 address)
     }
 
     /* Fast flag analysis */
-    u8 requiredFlags = instr->requiredFlags;
+    u8 requiredFlags = M6502::Asm::all; // leaving the jit, all flags must be set
     while (!_stack.empty()) {
         instr = _stack.top();
         _stack.pop();
         instr->requiredFlags = requiredFlags;
-        requiredFlags &= ~Asm::instructions[instr->opcode].wflags;
-        requiredFlags |= ~Asm::instructions[instr->opcode].rflags;
+        if (instr->branch) {
+            requiredFlags = M6502::Asm::all;
+        } else {
+            requiredFlags &= ~Asm::instructions[instr->opcode].wflags;
+            requiredFlags |= Asm::instructions[instr->opcode].rflags;
+        }
     }
 
     /* Compile instruction block. */
@@ -190,6 +194,8 @@ const X86::Reg<u8> A = X86::dh;
 const X86::Reg<u8> X = X86::bl;
 const X86::Reg<u8> Y = X86::bh;
 
+static u8 requiredFlags;
+
 };
 
 /**
@@ -204,11 +210,28 @@ static void incrementCycles(X86::Emitter &emit, u32 upd)
 }
 
 /**
+ * Check compatibility of 6502 status flags against x86 status flags.
+ */
+static bool checkStatusFlags(u32 mask, u8 flags)
+{
+    u8 converted = 0;
+    if (mask & X86::carry) converted |= M6502::Asm::carry;
+    if (mask & X86::sign) converted |= M6502::Asm::negative;
+    if (mask & X86::zero) converted |= M6502::Asm::zero;
+    if (mask & X86::overflow) converted |= M6502::Asm::overflow;
+
+    return (converted & flags) != 0;
+}
+
+/**
  * Generate bytecode to update selected status flags in the saved
  * state pushed onto the stack.
  */
-static void updateStatusFlags(X86::Emitter &emit, u32 mask)
+static void updateStatusFlags(X86::Emitter &emit, u32 mask, u8 flags)
 {
+    if (!checkStatusFlags(mask, flags))
+        return;
+
     /// FIXME
     // Cannot use
     //   emit.OR(X86::esp(), X86::eax);
@@ -235,10 +258,13 @@ static void restoreStatusFlags(X86::Emitter &emit)
  * Generate bytecode to set the Zero and Sign bits depending on the value
  * in the given register \p r.
  */
-static void testZeroSign(X86::Emitter &emit, const X86::Reg<u8> &r)
+static void testZeroSign(X86::Emitter &emit, const X86::Reg<u8> &r, u8 flags)
 {
+    if ((flags & M6502::Asm::carry) == 0 &&
+        (flags & M6502::Asm::negative) == 0)
+        return;
     emit.TEST(r, r);
-    updateStatusFlags(emit, X86::zero | X86::sign);
+    updateStatusFlags(emit, X86::zero | X86::sign, flags);
 }
 
 /**
@@ -257,7 +283,7 @@ static void compare(
      */
     emit.CMP(r0, r1);
     emit.CMC();
-    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry, Jit::requiredFlags);
 }
 
 static inline bool ADC(X86::Emitter &emit, const X86::Reg<u8> &r) {
@@ -269,13 +295,13 @@ static inline bool ADC(X86::Emitter &emit, const X86::Reg<u8> &r) {
 
 static inline bool AND(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.AND(Jit::A, r);
-    updateStatusFlags(emit, X86::zero | X86::sign);
+    updateStatusFlags(emit, X86::zero | X86::sign, Jit::requiredFlags);
     return false;
 }
 
 static inline bool ASL(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.SHL(r);
-    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry, Jit::requiredFlags);
     return true;
 }
 
@@ -303,40 +329,40 @@ static inline bool DCP(X86::Emitter &emit, const X86::Reg<u8> &r) {
 
 static inline bool DEC(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.DEC(r);
-    updateStatusFlags(emit, X86::zero | X86::sign);
+    updateStatusFlags(emit, X86::zero | X86::sign, Jit::requiredFlags);
     return true;
 }
 
 static inline void DEX(X86::Emitter &emit) {
     emit.DEC(Jit::X);
-    updateStatusFlags(emit, X86::zero | X86::sign);
+    updateStatusFlags(emit, X86::zero | X86::sign, Jit::requiredFlags);
 }
 
 static inline void DEY(X86::Emitter &emit) {
     emit.DEC(Jit::Y);
-    updateStatusFlags(emit, X86::zero | X86::sign);
+    updateStatusFlags(emit, X86::zero | X86::sign, Jit::requiredFlags);
 }
 
 static inline bool EOR(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.XOR(Jit::A, r);
-    updateStatusFlags(emit, X86::zero | X86::sign);
+    updateStatusFlags(emit, X86::zero | X86::sign, Jit::requiredFlags);
     return false;
 }
 
 static inline bool INC(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.INC(r);
-    updateStatusFlags(emit, X86::zero | X86::sign);
+    updateStatusFlags(emit, X86::zero | X86::sign, Jit::requiredFlags);
     return true;
 }
 
 static inline void INX(X86::Emitter &emit) {
     emit.INC(Jit::X);
-    updateStatusFlags(emit, X86::zero | X86::sign);
+    updateStatusFlags(emit, X86::zero | X86::sign, Jit::requiredFlags);
 }
 
 static inline void INY(X86::Emitter &emit) {
     emit.INC(Jit::Y);
-    updateStatusFlags(emit, X86::zero | X86::sign);
+    updateStatusFlags(emit, X86::zero | X86::sign, Jit::requiredFlags);
 }
 
 /** Unofficial opcode, composition of INC and SBC. */
@@ -352,13 +378,13 @@ static inline bool ISB(X86::Emitter &emit, const X86::Reg<u8> &r) {
 
 static inline bool LSR(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.SHR(r);
-    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry, Jit::requiredFlags);
     return true;
 }
 
 static inline bool ORA(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.OR(Jit::A, r);
-    updateStatusFlags(emit, X86::zero | X86::sign);
+    updateStatusFlags(emit, X86::zero | X86::sign, Jit::requiredFlags);
     return false;
 }
 
@@ -366,25 +392,25 @@ static inline bool ORA(X86::Emitter &emit, const X86::Reg<u8> &r) {
 static inline bool RLA(X86::Emitter &emit, const X86::Reg<u8> &r) {
     restoreStatusFlags(emit);
     emit.RCL(r);
-    updateStatusFlags(emit, X86::carry);
+    updateStatusFlags(emit, X86::carry, Jit::requiredFlags);
     emit.AND(Jit::A, r);
-    updateStatusFlags(emit, X86::zero | X86::sign);
+    updateStatusFlags(emit, X86::zero | X86::sign, Jit::requiredFlags);
     return true;
 }
 
 static inline bool ROL(X86::Emitter &emit, const X86::Reg<u8> &r) {
     restoreStatusFlags(emit);
     emit.RCL(r);
-    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
-    testZeroSign(emit, r);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry, Jit::requiredFlags);
+    testZeroSign(emit, r, Jit::requiredFlags);
     return true;
 }
 
 static inline bool ROR(X86::Emitter &emit, const X86::Reg<u8> &r) {
     restoreStatusFlags(emit);
     emit.RCR(r);
-    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
-    testZeroSign(emit, r);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry, Jit::requiredFlags);
+    testZeroSign(emit, r, Jit::requiredFlags);
     return true;
 }
 
@@ -392,8 +418,8 @@ static inline bool ROR(X86::Emitter &emit, const X86::Reg<u8> &r) {
 static inline bool RRA(X86::Emitter &emit, const X86::Reg<u8> &r) {
     restoreStatusFlags(emit);
     emit.RCR(r);
-    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry);
-    testZeroSign(emit, r);
+    updateStatusFlags(emit, X86::zero | X86::sign | X86::carry, Jit::requiredFlags);
+    testZeroSign(emit, r, Jit::requiredFlags);
     emit.POPF();
     emit.ADC(Jit::A, r);
     emit.PUSHF();
@@ -412,18 +438,18 @@ static inline bool SBC(X86::Emitter &emit, const X86::Reg<u8> &r) {
 /** Unofficial opcode, composition of ASL and ORA. */
 static inline bool SLO(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.SHL(r);
-    updateStatusFlags(emit, X86::carry);
+    updateStatusFlags(emit, X86::carry, Jit::requiredFlags);
     emit.OR(Jit::A, r);
-    updateStatusFlags(emit, X86::zero | X86::sign);
+    updateStatusFlags(emit, X86::zero | X86::sign, Jit::requiredFlags);
     return true;
 }
 
 /** Unofficial opcode, composition of LSR and EOR. */
 static inline bool SRE(X86::Emitter &emit, const X86::Reg<u8> &r) {
     emit.SHR(r);
-    updateStatusFlags(emit, X86::carry);
+    updateStatusFlags(emit, X86::carry, Jit::requiredFlags);
     emit.XOR(Jit::A, r);
-    updateStatusFlags(emit, X86::zero | X86::sign);
+    updateStatusFlags(emit, X86::zero | X86::sign, Jit::requiredFlags);
     return true;
 }
 
@@ -500,28 +526,28 @@ static inline bool LAX(X86::Emitter &emit, const X86::Reg<u8> &r) {
         emit.MOV(Jit::A, r);
     if (r != Jit::X)
         emit.MOV(Jit::X, r);
-    testZeroSign(emit, r);
+    testZeroSign(emit, r, Jit::requiredFlags);
     return false;
 }
 
 static inline bool LDA(X86::Emitter &emit, const X86::Reg<u8> &r) {
     if (r != Jit::A)
         emit.MOV(Jit::A, r);
-    testZeroSign(emit, r);
+    testZeroSign(emit, r, Jit::requiredFlags);
     return false;
 }
 
 static inline bool LDX(X86::Emitter &emit, const X86::Reg<u8> &r) {
     if (r != Jit::X)
         emit.MOV(Jit::X, r);
-    testZeroSign(emit, Jit::X);
+    testZeroSign(emit, Jit::X, Jit::requiredFlags);
     return false;
 }
 
 static inline bool LDY(X86::Emitter &emit, const X86::Reg<u8> &r) {
     if (r != Jit::Y)
         emit.MOV(Jit::Y, r);
-    testZeroSign(emit, Jit::Y);
+    testZeroSign(emit, Jit::Y, Jit::requiredFlags);
     return false;
 }
 
@@ -552,7 +578,7 @@ static inline void PHP(X86::Emitter &emit) {
 
 static inline void PLA(X86::Emitter &emit) {
     PULL(emit, Jit::A);
-    testZeroSign(emit, Jit::A);
+    testZeroSign(emit, Jit::A, Jit::requiredFlags);
 }
 
 static inline void PLP(X86::Emitter &emit) {
@@ -611,12 +637,12 @@ static inline void TSX(X86::Emitter &emit) {
     emit.MOV(X86::eax, (u32)&currentState->stack);
     emit.MOV(X86::ecx, X86::eax());
     emit.MOV(Jit::X, X86::cl);
-    testZeroSign(emit, Jit::X);
+    testZeroSign(emit, Jit::X, Jit::requiredFlags);
 }
 
 static inline void TXA(X86::Emitter &emit) {
     emit.MOV(Jit::A, Jit::X);
-    testZeroSign(emit, Jit::A);
+    testZeroSign(emit, Jit::A, Jit::requiredFlags);
 }
 
 static inline void TXS(X86::Emitter &emit) {
@@ -628,7 +654,7 @@ static inline void TXS(X86::Emitter &emit) {
 
 static inline void TYA(X86::Emitter &emit) {
     emit.MOV(Jit::A, Jit::Y);
-    testZeroSign(emit, Jit::A);
+    testZeroSign(emit, Jit::A, Jit::requiredFlags);
 }
 
 /**
@@ -1236,6 +1262,7 @@ static u16 getIndirect(void) {
 void Instruction::compile(X86::Emitter &emit)
 {
     nativeCode = emit.getPtr();
+    Jit::requiredFlags = requiredFlags;
 
     /* Exit instruction. */
     if (exit) {
