@@ -1587,6 +1587,21 @@ void Instruction::setNext(Instruction *instr)
     next = instr;
 }
 
+extern "C" {
+/**
+ * Assembly entry point.
+ *
+ * @param code      Pointer to recompiled native code
+ * @param regs      Pointer to the structure containing the register values
+ * @param cycle     Value of the cycle counter preceding the execution of the
+ *                  first recompiled instruction
+ */
+extern unsigned long asmEntry(
+    const void *nativeCode,
+    Registers *regs,
+    unsigned long cycle);
+};
+
 /**
  * Jump to the compiled instruction and continue the emulation in native code.
  * The registers are loaded into matching native registers, and the code jumps
@@ -1602,55 +1617,6 @@ void Instruction::run()
     // trace(opcode);
     Registers *regs = &currentState->regs;
     currentState->stack = Memory::ram + 0x100 + regs->sp;
-    asm (
-        /* Save pointer to regs (scratched by compiled code) */
-        "push %%ecx\n"
-        /* Load status flags */
-        "pushf\n"               // Load x86 status flags into %edx
-        "pop %%edx\n"
-        "and $0xf73e, %%dx\n"   // Clear Carry, Zero, Sign, Overflow bits
-        "mov 3(%%ecx), %%bl\n"  // Load 6502 status flags into %bl
-        "and $0x81, %%bl\n"     // Keep bits Carry and Sign
-        "or %%bl, %%dl\n"       // Write them to %edx
-        "mov $0, %%bx\n"
-        "mov 3(%%ecx), %%bl\n"  // Get 6502 status flags
-        "and $0x42, %%bx\n"     // Keep bits Zero and Overflow
-        "shl $5, %%bx\n"        // Left shift by 5 to place them correctly
-        "or %%bx, %%dx\n"       // Write them to %edx
-        "push %%edx\n"          // Override the original flags with
-        "popf\n"                // the constructed value
-        /* Load A,X,Y registers */
-        "mov (%%ecx), %%dh\n"
-        "mov 1(%%ecx), %%bl\n"
-        "mov 2(%%ecx), %%bh\n"
-        /* Jump to native code */
-        "call asm_prefix%=\n"
-        /* Store A,X,Y registers */
-        "pop %%ecx\n"
-        "mov %%dh, (%%ecx)\n"
-        "mov %%bl, 1(%%ecx)\n"
-        "mov %%bh, 2(%%ecx)\n"
-        "mov %%ax, 6(%%ecx)\n"
-        /* Store status flags */
-        "pushf\n"               // Load x86 status flags into %edx
-        "pop %%edx\n"
-        "push %%edx\n"          // Keep a copy of the original x86 flags
-        "mov 3(%%ecx), %%bl\n"  // Get 6502 status flags
-        "and $0x3c, %%bl\n"     // Clear Carry, Zero, Sign, Overflow bits
-        "and $0x81, %%dl\n"
-        "or %%dl, %%bl\n"
-        "pop %%edx\n"
-        "shr $5, %%dx\n"
-        "and $0x42, %%dl\n"
-        "or %%dl, %%bl\n"
-        "mov %%bl, 3(%%ecx)\n"
-        "jmp asm_exit%=\n"
-        "asm_prefix%=:\n"       // Push the flags before JMPing to the
-        "pushf\n"               // compiled code
-        "jmp *%1\n"
-        "asm_exit%=:\n"
-        :
-        : "c" (regs), "r" (nativeCode)
-        : "%edx", "%ebx");
+    asmEntry(nativeCode, regs, currentState->cycles);
     regs->sp = currentState->stack - Memory::ram - 0x100;
 }
