@@ -197,8 +197,10 @@ const X86::Reg<u8> Y = X86::bh;
  */
 static void incrementCycles(X86::Emitter &emit, u32 upd)
 {
-    emit.MOV(X86::eax, (u32)&currentState->cycles);
-    emit.ADD(X86::eax(), upd);
+    if (upd == 1)
+        emit.INC(X86::esi);
+    else
+        emit.ADD(X86::esi, upd);
 }
 
 /**
@@ -852,8 +854,7 @@ static void loadAbsoluteX(
     // Note: the dummy read is important only if the address is linked
     // to the PPU registers.
     if (!wb) {
-        emit.MOV(X86::ecx, (u32)&currentState->cycles);
-        emit.INC(X86::ecx());
+        emit.INC(X86::esi);
     }
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
@@ -920,8 +921,7 @@ static void loadAbsoluteY(
     // Note: the dummy read is important only if the address is linked
     // to the PPU registers.
     if (!wb) {
-        emit.MOV(X86::ecx, (u32)&currentState->cycles);
-        emit.INC(X86::ecx());
+        emit.INC(X86::esi);
     }
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
@@ -1047,8 +1047,7 @@ static void loadIndirectIndexed(
     // Note: the dummy read is important only if the address is linked
     // to the PPU registers.
     if (!wb) {
-        emit.MOV(X86::eax, (u32)&currentState->cycles);
-        emit.INC(X86::eax());
+        emit.INC(X86::esi);
     }
     emit.PUSH(X86::edx);
     emit.PUSH(X86::ecx);
@@ -1226,13 +1225,11 @@ static u16 getIndirect(void) {
         emit.POPF();                                                           \
         u32 *__next = oppcond();                                               \
         emit.PUSHF();                                                          \
-        emit.MOV(X86::eax, (u32)&currentState->cycles);                        \
-        emit.ADD(X86::eax(), (u32)(3 + PAGE_DIFF(address + 2, branchAddress))); \
+        emit.ADD(X86::esi, (u32)(3 + PAGE_DIFF(address + 2, branchAddress)));  \
         nativeBranchAddress = emit.JMP();                                      \
         emit.setJump(__next, emit.getPtr());                                   \
         emit.PUSHF();                                                          \
-        emit.MOV(X86::eax, (u32)&currentState->cycles);                        \
-        emit.ADD(X86::eax(), (u32)2);                                          \
+        emit.ADD(X86::esi, (u32)2);                                            \
         break;                                                                 \
     }
 
@@ -1617,6 +1614,6 @@ void Instruction::run()
     // trace(opcode);
     Registers *regs = &currentState->regs;
     currentState->stack = Memory::ram + 0x100 + regs->sp;
-    asmEntry(nativeCode, regs, currentState->cycles);
+    currentState->cycles = asmEntry(nativeCode, regs, currentState->cycles);
     regs->sp = currentState->stack - Memory::ram - 0x100;
 }
