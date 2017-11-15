@@ -5,6 +5,7 @@
  *
  * @param code      Pointer to recompiled native code
  * @param regs      Pointer to the structure containing the register values
+ * @param stack     Pointer to the top of the stack
  * @param quantum   Expected (negative) number of cycles to emulate
  */
 .text
@@ -39,8 +40,12 @@ asmEntry:
         mov     bl, byte ptr [ecx + 1]
         mov     bh, byte ptr [ecx + 2]
 
+        /* Load stack pointer into edi */
+        mov     edi, dword ptr [ebp + 16]
+        mov     edi, dword ptr [edi]
+
         /* Load cycle count into esi */
-        mov     esi, dword ptr [ebp + 16]
+        mov     esi, dword ptr [ebp + 20]
 
         /* Load jump address and jump */
         mov     eax, dword ptr [ebp + 8]
@@ -73,6 +78,10 @@ asm_exit:
         or      bl, dl
         mov     [ecx + 3], bl
 
+        /* Update stack pointer */
+        mov     eax, dword ptr [ebp + 16]
+        mov     dword ptr [eax], edi
+
         /* Return cycle count in eax */
         mov     eax, esi
 
@@ -86,6 +95,7 @@ asm_exit:
 
 /*
 :    :
+|  2 | [ebp + 20] (4th function argument)
 |  2 | [ebp + 16] (3rd function argument)
 |  5 | [ebp + 12] (2nd argument)
 | 10 | [ebp + 8]  (1st argument)

@@ -467,19 +467,17 @@ static inline bool SRE(X86::Emitter &emit, const X86::Reg<u8> &r) {
 }
 
 static inline void PUSH(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    emit.MOV(X86::eax, (u32)&currentState->stack);
-    emit.MOV(X86::ecx, X86::eax());
+    emit.MOV(X86::ecx, X86::edi);
     emit.MOV(X86::ecx(), r);
     emit.DEC(X86::cl); // Will wrap on stack overflow
-    emit.MOV(X86::eax(), X86::ecx);
+    emit.MOV(X86::edi, X86::ecx);
 }
 
 static inline void PULL(X86::Emitter &emit, const X86::Reg<u8> &r) {
-    emit.MOV(X86::eax, (u32)&currentState->stack);
-    emit.MOV(X86::ecx, X86::eax());
+    emit.MOV(X86::ecx, X86::edi);
     emit.INC(X86::cl); // Will wrap on stack underflow
     emit.MOV(r, X86::ecx());
-    emit.MOV(X86::eax(), X86::ecx);
+    emit.MOV(X86::edi, X86::ecx);
 }
 
 static inline bool NOP(X86::Emitter &emit, const X86::Reg<u8> &r) {
@@ -583,11 +581,7 @@ static inline void PHP(X86::Emitter &emit) {
     emit.SHR(X86::ecx, 5);
     emit.AND(X86::cl, 0x42);
     emit.OR(Jit::M, X86::cl);
-    emit.MOV(X86::eax, (u32)&currentState->stack);
-    emit.MOV(X86::ecx, X86::eax());
-    emit.MOV(X86::ecx(), Jit::M);
-    emit.DEC(X86::cl); // Will wrap on stack overflow
-    emit.MOV(X86::eax(), X86::ecx);
+    PUSH(emit, Jit::M);
 }
 
 static inline void PLA(X86::Emitter &emit) {
@@ -598,12 +592,8 @@ static inline void PLA(X86::Emitter &emit) {
 static inline void PLP(X86::Emitter &emit) {
     u8 *p = &currentState->regs.p;
     /* Unstack new flag values */
-    emit.MOV(X86::eax, (u32)&currentState->stack);
-    emit.MOV(X86::ecx, X86::eax());
-    emit.INC(X86::cl); // Will wrap on stack underflow
-    emit.MOV(Jit::M, X86::ecx());
+    PULL(emit, Jit::M);
     emit.AND(Jit::M, ~0x30); // Clear virtual flags
-    emit.MOV(X86::eax(), X86::ecx);
     /* Update Interrupt, Decimal, etc. flags in currentState memory. */
     emit.MOV(X86::eax, (u32)p);
     emit.MOV(X86::eax(), Jit::M);
@@ -648,8 +638,7 @@ static inline void TAY(X86::Emitter &emit) {
 }
 
 static inline void TSX(X86::Emitter &emit) {
-    emit.MOV(X86::eax, (u32)&currentState->stack);
-    emit.MOV(X86::ecx, X86::eax());
+    emit.MOV(X86::ecx, X86::edi);
     emit.MOV(Jit::X, X86::cl);
     testZeroSign(emit, Jit::X, Jit::requiredFlags);
 }
@@ -660,10 +649,9 @@ static inline void TXA(X86::Emitter &emit) {
 }
 
 static inline void TXS(X86::Emitter &emit) {
-    emit.MOV(X86::eax, (u32)&currentState->stack);
-    emit.MOV(X86::ecx, X86::eax());
+    emit.MOV(X86::ecx, X86::edi);
     emit.MOV(X86::cl, Jit::X);
-    emit.MOV(X86::eax(), X86::ecx);
+    emit.MOV(X86::edi, X86::ecx);
 }
 
 static inline void TYA(X86::Emitter &emit) {
@@ -1289,9 +1277,9 @@ void Instruction::compile(X86::Emitter &emit)
 
     /* Check jamming instructions. */
     if (Asm::instructions[opcode].jam) {
-        // error("jamming instruction, stopping execution\n");
-        // error("  PC $%04x\n", cpu.regs.pc);
-        // error("  opcode %02x\n", opcode);
+        std::cerr << "jamming instruction, stopping execution" << std::endl;
+        std::cerr << "  opcode " << std::hex << (int)opcode << std::endl;
+        std::cerr << "  pc     " << std::hex << (int)address << std::endl;
         throw "Jamming instruction";
     }
 
@@ -1606,7 +1594,8 @@ void Instruction::compile(X86::Emitter &emit)
 
         default:
             std::cerr << "unsupported instruction, stopping execution" << std::endl;
-            std::cerr << "  opcode " << (int)opcode << std::endl;
+            std::cerr << "  opcode " << std::hex << (int)opcode << std::endl;
+            std::cerr << "  pc     " << std::hex << (int)address << std::endl;
             throw "Unsupported instruction";
     }
 
@@ -1642,6 +1631,7 @@ extern "C" {
 extern long asmEntry(
     const void *nativeCode,
     Registers *regs,
+    u8 **stack,
     long quantum);
 };
 
@@ -1659,8 +1649,8 @@ void Instruction::run(long quantum)
 
     // trace(opcode);
     Registers *regs = &currentState->regs;
-    currentState->stack = Memory::ram + 0x100 + regs->sp;
-    long r = asmEntry(nativeCode, regs, -quantum);
+    u8 *stack = Memory::ram + 0x100 + regs->sp;
+    long r = asmEntry(nativeCode, regs, &stack, -quantum);
     currentState->cycles += r + quantum;
-    regs->sp = currentState->stack - Memory::ram - 0x100;
+    regs->sp = stack - Memory::ram - 0x100;
 }
