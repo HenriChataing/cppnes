@@ -5,7 +5,7 @@
  *
  * @param code      Pointer to recompiled native code
  * @param regs      Pointer to the structure containing the register values
- * @param stack     Pointer to the top of the stack
+ * @param stack     Pointer to the start of the 6502 stack buffer
  * @param quantum   Expected (negative) number of cycles to emulate
  */
 .text
@@ -32,20 +32,23 @@ asmEntry:
         and     bx, 0x42                    // Keep bits Zero and Overflow
         shl     bx, 5                       // Left shift by 5 to place them correctly
         or      dx, bx                      // Write them to %edx
-        push    edx                         // Override the original flags with
-        popf                                // the constructed value
+        push    edx                         // Save constructed EFLAGS
 
         /* Load A,X,Y registers */
         mov     dh, byte ptr [ecx]
         mov     bl, byte ptr [ecx + 1]
         mov     bh, byte ptr [ecx + 2]
 
-        /* Load stack pointer into edi */
-        mov     edi, dword ptr [ebp + 16]
-        mov     edi, dword ptr [edi]
+        /* Load SP register */
+        mov     eax, dword ptr [ebp + 16]
+        add     al, byte ptr [ecx + 4]
+        mov     edi, eax
 
         /* Load cycle count into esi */
         mov     esi, dword ptr [ebp + 20]
+
+        /* Load constructed EFLAGS */
+        popf
 
         /* Load jump address and jump */
         mov     eax, dword ptr [ebp + 8]
@@ -53,10 +56,14 @@ asmEntry:
         jmp     asm_exit
 
 asm_entry:
+        /* Push EFLAGS on top of the stack */
         pushf
         jmp     eax
 
 asm_exit:
+        /* Save EFLAGS on top of the stack */
+        pushf
+
         /* Store A,X,Y, PC registers */
         mov     ecx, dword ptr [ebp + 12]   // Load \p regs into ecx
         mov     byte ptr [ecx], dh
@@ -64,9 +71,13 @@ asm_exit:
         mov     byte ptr [ecx + 2], bh
         mov     word ptr [ecx + 6], ax
 
+        /* Update SP register */
+        mov     eax, edi
+        sub     eax, dword ptr [ebp + 16]
+        mov     byte ptr [ecx + 4], al
+
         /* Store status flags */
-        pushf                               // Load x86 status flags into %edx
-        pop     edx
+        pop     edx                         // Retrieve EFLAGS
         push    edx                         // Keep a copy of the original x86 flags
         mov     bl, [ecx + 3]               // Get 6502 status flags
         and     bl, 0x3c                    // Clear Carry, Zero, Sign, Overflow bits
@@ -77,10 +88,6 @@ asm_exit:
         and     dl, 0x42
         or      bl, dl
         mov     [ecx + 3], bl
-
-        /* Update stack pointer */
-        mov     eax, dword ptr [ebp + 16]
-        mov     dword ptr [eax], edi
 
         /* Return cycle count in eax */
         mov     eax, esi

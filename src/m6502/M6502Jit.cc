@@ -1625,13 +1625,14 @@ extern "C" {
  *
  * @param code      Pointer to recompiled native code
  * @param regs      Pointer to the structure containing the register values
+ * @param stack     Pointer to the start of the 6502 stack buffer
  * @param quantum   Expected number of cycles to emulate
  * @return          Incremented value of the quantum
  */
 extern long asmEntry(
     const void *nativeCode,
     Registers *regs,
-    u8 **stack,
+    u8 *stack,
     long quantum);
 };
 
@@ -1649,8 +1650,7 @@ void Instruction::run(long quantum)
 
     // trace(opcode);
     Registers *regs = &currentState->regs;
-    u8 *stack = Memory::ram + 0x100 + regs->sp;
-    long r = asmEntry(nativeCode, regs, &stack, -quantum);
+    u8 *stack = Memory::ram + 0x100;
+    long r = asmEntry(nativeCode, regs, stack, -quantum);
     currentState->cycles += r + quantum;
-    regs->sp = stack - Memory::ram - 0x100;
 }
