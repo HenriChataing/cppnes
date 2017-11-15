@@ -154,6 +154,10 @@ public:
         ptrdiff_t rel = loc - (u8*)ins - 4;
         *ins = (u32)rel;
     }
+    void setJump(u32 *ins) {
+        ptrdiff_t rel = getPtr() - (u8*)ins - 4;
+        *ins = (u32)rel;
+    }
 
     /* Missing instructions INC and DEC on BYTE memory locations. */
     void INC(const Reg<u8> &r) { put(0xfe); put(0xc0 | r.code); }

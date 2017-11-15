@@ -40,7 +40,7 @@ void emulate()
             /* Try jit */
             M6502::Instruction *instr = M6502::cache.cache(M6502::currentState->regs.pc);
             if (instr != NULL)
-                instr->run();
+                instr->run(1000);
             /* Evaluate next instruction */
             u8 opcode = Memory::load(M6502::currentState->regs.pc);
             M6502::Eval::runOpcode(opcode);

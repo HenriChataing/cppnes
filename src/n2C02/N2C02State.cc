@@ -361,7 +361,6 @@ void State::writeRegister(u16 addr, u8 val)
 void State::dmaTransfer(u8 val)
 {
     /* Synchronize with CPU */
-    N2C02::sync();
     oam.raw[currentState->oamaddr++] = val;
 }
 

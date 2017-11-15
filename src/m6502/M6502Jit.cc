@@ -38,14 +38,14 @@ Instruction::Instruction(u16 address, u8 opcode, u8 op0, u8 op1)
         case JSR_ABS:
         case RTI_IMP:
         case RTS_IMP:
-        case BCC_REL:
-        case BCS_REL:
-        case BEQ_REL:
-        case BMI_REL:
-        case BNE_REL:
-        case BPL_REL:
-        case BVC_REL:
-        case BVS_REL:
+        // case BCC_REL:
+        // case BCS_REL:
+        // case BEQ_REL:
+        // case BMI_REL:
+        // case BNE_REL:
+        // case BPL_REL:
+        // case BVC_REL:
+        // case BVS_REL:
             exit = true;
             break;
         default:
@@ -207,6 +207,19 @@ static void incrementCycles(X86::Emitter &emit, u32 upd)
         emit.INC(X86::esi);
     else
         emit.ADD(X86::esi, upd);
+}
+
+/**
+ * Check the cycle count.
+ */
+static void checkCycles(X86::Emitter &emit, u16 address)
+{
+    emit.CMP(X86::esi, 0);
+    u32 *jmp = emit.JL();
+    emit.MOV(X86::eax, address);
+    emit.POPF();
+    emit.RETN();
+    emit.setJump(jmp);
 }
 
 /**
@@ -890,7 +903,7 @@ static void loadAbsoluteX(
     emit.POP(X86::edx);
     emit.INC(X86::ah);
     // Back to regular load.
-    emit.setJump(jmp, emit.getPtr());
+    emit.setJump(jmp);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::load);
@@ -957,7 +970,7 @@ static void loadAbsoluteY(
     emit.POP(X86::edx);
     emit.INC(X86::ah);
     // Back to regular load.
-    emit.setJump(jmp, emit.getPtr());
+    emit.setJump(jmp);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
     emit.CALL((u8 *)Memory::load);
@@ -1083,7 +1096,7 @@ static void loadIndirectIndexed(
     emit.POP(X86::edx);
     emit.INC(X86::ch);
     // Back to regular load.
-    emit.setJump(jmp, emit.getPtr());
+    emit.setJump(jmp);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::ecx);
     emit.CALL((u8 *)Memory::load);
@@ -1249,12 +1262,13 @@ static u16 getIndirect(void) {
 /** Create a banch instruction with the given condition. */
 #define CASE_BR(op, oppcond)                                                   \
     case op##_REL: {                                                           \
+        checkCycles(emit, address);                                            \
         emit.POPF();                                                           \
         u32 *__next = oppcond();                                               \
         emit.PUSHF();                                                          \
         emit.ADD(X86::esi, (u32)(3 + PAGE_DIFF(address + 2, branchAddress)));  \
         nativeBranchAddress = emit.JMP();                                      \
-        emit.setJump(__next, emit.getPtr());                                   \
+        emit.setJump(__next);                                                  \
         emit.PUSHF();                                                          \
         emit.ADD(X86::esi, (u32)2);                                            \
         break;                                                                 \
@@ -1616,15 +1630,19 @@ extern "C" {
 /**
  * Assembly entry point.
  *
+ * The quantum is negative and incremented for each instruction. It is tested
+ * for zero at each branch instructions, meaning the jit can emulate more
+ * cpu cycles than indicated by the \p quantum.
+ *
  * @param code      Pointer to recompiled native code
  * @param regs      Pointer to the structure containing the register values
- * @param cycle     Value of the cycle counter preceding the execution of the
- *                  first recompiled instruction
+ * @param quantum   Expected number of cycles to emulate
+ * @return          Incremented value of the quantum
  */
-extern unsigned long asmEntry(
+extern long asmEntry(
     const void *nativeCode,
     Registers *regs,
-    unsigned long cycle);
+    long quantum);
 };
 
 /**
@@ -1634,14 +1652,15 @@ extern unsigned long asmEntry(
  * The last instruction is supposed to place the value of PC onto the stack to
  * inform the caller of the state reached.
  */
-void Instruction::run()
+void Instruction::run(long quantum)
 {
-    if (exit)
+    if (exit || quantum <= 0)
         return;
 
     // trace(opcode);
     Registers *regs = &currentState->regs;
     currentState->stack = Memory::ram + 0x100 + regs->sp;
-    currentState->cycles = asmEntry(nativeCode, regs, currentState->cycles);
+    long r = asmEntry(nativeCode, regs, -quantum);
+    currentState->cycles += r + quantum;
     regs->sp = currentState->stack - Memory::ram - 0x100;
 }

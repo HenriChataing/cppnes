@@ -5,8 +5,7 @@
  *
  * @param code      Pointer to recompiled native code
  * @param regs      Pointer to the structure containing the register values
- * @param cycle     Value of the cycle counter preceding the execution of the
- *                  first recompiled instruction
+ * @param quantum   Expected (negative) number of cycles to emulate
  */
 .text
 .global asmEntry

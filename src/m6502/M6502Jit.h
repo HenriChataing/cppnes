@@ -19,7 +19,7 @@ public:
 
     void setNext(Instruction *instr);
     void compile(X86::Emitter &emit);
-    void run();
+    void run(long quantum);
 
     u16 address;
     u16 branchAddress;
