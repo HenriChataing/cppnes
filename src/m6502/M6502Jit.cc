@@ -560,6 +560,7 @@ static inline void PHP(X86::Emitter &emit) {
     emit.MOV(X86::eax, (u32)p);
     emit.MOV(Jit::M, X86::eax());
     emit.AND(Jit::M, 0x3c); // Clear Carry, Zero, Overflow, Sign flags
+    emit.OR(Jit::M, 0x30); // Set virtual flags
     emit.POP(X86::ecx);
     emit.PUSH(X86::ecx);
     emit.AND(X86::cl, 0x81);
@@ -588,7 +589,7 @@ static inline void PLP(X86::Emitter &emit) {
     emit.MOV(X86::ecx, X86::eax());
     emit.INC(X86::cl); // Will wrap on stack underflow
     emit.MOV(Jit::M, X86::ecx());
-    emit.AND(Jit::M, ~0x30); // Mask virtual flags
+    emit.AND(Jit::M, ~0x30); // Clear virtual flags
     emit.MOV(X86::eax(), X86::ecx);
     /* Update Interrupt, Decimal, etc. flags in currentState memory. */
     emit.MOV(X86::eax, (u32)p);
