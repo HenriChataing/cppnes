@@ -5,6 +5,8 @@
 
 #include "type.h"
 
+#define M6502_BACKTRACE_MAX 16
+
 namespace M6502
 {
 
@@ -51,6 +53,8 @@ public:
 };
 
 extern State *currentState;
+
+void backtrace();
 
 };
 

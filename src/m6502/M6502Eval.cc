@@ -1,6 +1,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include <vector>
 
 #include "M6502State.h"
 #include "M6502Eval.h"
@@ -9,6 +10,20 @@
 #include "exception.h"
 
 using namespace M6502;
+
+struct BacktraceEntry
+{
+    u8 opcode;
+    Registers regs;
+    ulong cycles;
+
+    BacktraceEntry(u8 opcode, const Registers &regs, ulong cycles)
+        : opcode(opcode), regs(regs), cycles(cycles) {}
+};
+
+#ifdef CPU_BACKTRACE
+static std::vector<BacktraceEntry> _backtrace;
+#endif
 
 #define A           (currentState->regs.a)
 #define X           (currentState->regs.x)
@@ -262,6 +277,10 @@ static inline void NOP(u16 m) {
  */
 
 static inline void BRK(u8 m) {
+#ifdef CPU_BACKTRACE
+    _backtrace.push_back(
+        BacktraceEntry(BRK_IMP, currentState->regs, currentState->cycles));
+#endif
     (void)m;
     PUSH(PC_HI);
     PUSH(PC_LO);
@@ -275,6 +294,10 @@ static inline void JMP(u16 pc) {
 }
 
 static inline void JSR(u16 pc) {
+#ifdef CPU_BACKTRACE
+    _backtrace.push_back(
+        BacktraceEntry(JSR_ABS, currentState->regs, currentState->cycles));
+#endif
     PC--;
     PUSH(PC_HI);
     PUSH(PC_LO);
@@ -287,6 +310,9 @@ static inline void RTI() {
     lo = PULL();
     hi = PULL();
     PC = WORD(hi, lo);
+#ifdef CPU_BACKTRACE
+    _backtrace.pop_back();
+#endif
 }
 
 static inline void RTS() {
@@ -294,6 +320,9 @@ static inline void RTS() {
     lo = PULL();
     hi = PULL();
     PC = WORD(hi, lo) + 1;
+#ifdef CPU_BACKTRACE
+    _backtrace.pop_back();
+#endif
 }
 
 static inline void BIT(u8 m) {
@@ -864,6 +893,138 @@ void trace(u8 opcode)
     std::cerr << std::nouppercase << std::endl;
 }
 
+#ifdef CPU_BACKTRACE
+
+/**
+ * @brief Display the program backtrace.
+ */
+void backtrace()
+{
+    using namespace std;
+
+    for (int i = _backtrace.size() - 1; i >= 0; i --)
+    {
+        u8 opcode, arg0, arg1;
+        u16 pc, jumpto;
+
+        pc = _backtrace[i].regs.pc;
+        opcode = _backtrace[i].opcode;
+
+        if (Asm::instructions[opcode].bytes > 1)
+            arg0 = Memory::load(pc + 1);
+        if (Asm::instructions[opcode].bytes > 2)
+            arg1 = Memory::load(pc + 2);
+
+        cerr << hex << uppercase << setfill('0');
+        cerr << setw(4) << (int)pc << "  ";
+        cerr << setw(2) << (int)opcode << " ";
+
+        /* Raw instruction bytes. */
+        switch (Asm::instructions[opcode].bytes)
+        {
+            case 1:
+                cerr << "     ";
+                break;
+            case 2:
+                cerr << setw(2) << (int)arg0 << "   ";
+                break;
+            default:
+                cerr << setw(2) << (int)arg0 << " ";
+                cerr << setw(2) << (int)arg1;
+                break;
+        }
+
+        /* Identify non-standard instructions. */
+        if (Asm::instructions[opcode].unofficial)
+            cerr << " *";
+        else
+            cerr << "  ";
+
+        /* Print instruction assembly name. */
+        cerr << Asm::instructions[opcode].name << " ";
+
+        /* Format operands. */
+        switch (Asm::instructions[opcode].type)
+        {
+            case Asm::IMM:
+                cerr << "#$" << setw(2) << (int)arg0 << "   ";
+                break;
+            case Asm::ZPG:
+                cerr << "$" << setw(2) << (int)arg0 << "    ";
+                break;
+            case Asm::ZPX:
+                cerr << "$" << setw(2) << (int)arg0 << ",X  ";
+                break;
+            case Asm::ZPY:
+                cerr << "$" << setw(2) << (int)arg0 << ",Y  ";
+                break;
+            case Asm::ABS:
+                cerr << "$" << setw(4);
+                cerr << (int)(arg0 | ((int)arg1 << 8));
+                cerr << "  ";
+                break;
+            case Asm::ABX:
+                cerr << "$" << setw(4);
+                cerr << (int)(arg0 | ((int)arg1 << 8));
+                cerr << ",X";
+                break;
+            case Asm::ABY:
+                cerr << "$" << setw(4);
+                cerr << (int)(arg0 | ((int)arg1 << 8));
+                cerr << ",Y";
+                break;
+            case Asm::IND:
+                cerr << "($" << setw(4);
+                cerr << (int)(arg0 | ((int)arg1 << 8));
+                cerr << ")";
+                break;
+            case Asm::INX:
+                cerr << "($" << setw(2) << (int)arg0 << ",X)";
+                break;
+            case Asm::INY:
+                cerr << "($" << setw(2) << (int)arg0 << ",Y)";
+                break;
+            case Asm::REL:
+                /*
+                 * Directly compute the jump address and display it instead of the
+                 * relative offset.
+                 */
+                if (arg0 & 0x80) {
+                    arg0 = ~arg0 + 1;
+                    jumpto = pc + 2 - arg0;
+                } else
+                    jumpto = pc + 2 + arg0;
+                cerr << "$" << setw(4) << (int)jumpto << "  ";
+                break;
+            case Asm::IMP:
+                cerr << "       ";
+                break;
+            case Asm::ACC:
+                cerr << "A      ";
+                break;
+        }
+
+        cerr << "  A:" << setw(2) << (int)_backtrace[i].regs.a;
+        cerr << " X:" << setw(2) << (int)_backtrace[i].regs.x;
+        cerr << " Y:" << setw(2) << (int)_backtrace[i].regs.y;
+        cerr << " P:" << setw(2) << (int)_backtrace[i].regs.p;
+        cerr << " SP:" << setw(2) << (int)_backtrace[i].regs.sp;
+        cerr << " CYC:" << dec << _backtrace[i].cycles;
+        cerr << nouppercase << endl;
+    }
+}
+
+#else
+
+/**
+ * @brief Display the program backtrace.
+ */
+void backtrace()
+{
+}
+
+#endif /* CPU_BACKTRACE */
+
 namespace Eval {
 
 /**
@@ -876,6 +1037,13 @@ void triggerNMI()
     PUSH((P & ~0x30) | 0x20);
     P |= P_I;
     PC = Memory::loadw(Memory::NMI_ADDR);
+#ifdef CPU_BACKTRACE
+    _backtrace.push_back(
+        BacktraceEntry(
+            Memory::load(PC),
+            currentState->regs,
+            currentState->cycles));
+#endif
     currentState->cycles += Asm::instructions[BRK_IMP].cycles;
     currentState->nmi = false;
 }
@@ -888,6 +1056,13 @@ void triggerIRQ()
     /* Check if IRQ mask bit is set. */
     if (P & P_I)
         return;
+#ifdef CPU_BACKTRACE
+    _backtrace.push_back(
+        BacktraceEntry(
+            Memory::load(PC),
+            currentState->regs,
+            currentState->cycles));
+#endif
     PUSH(PC_HI);
     PUSH(PC_LO);
     PUSH((P & ~0x30) | 0x20);

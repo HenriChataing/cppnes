@@ -7,13 +7,13 @@
 namespace M6502 {
 
 void trace(u8 opcode);
+void backtrace();
 
 namespace Eval {
 
 void triggerNMI();
 void triggerIRQ();
 void runOpcode(u8 opcode);
-
 };
 };
 

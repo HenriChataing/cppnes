@@ -1164,19 +1164,11 @@ void Instruction::compile(X86::Emitter &emit)
     Jit::requiredFlags = requiredFlags;
 
     /* Exit instruction. */
-    if (exit) {
+    if (exit || Asm::instructions[opcode].jam) {
         emit.MOV(X86::eax, address);
         emit.POPF();
         emit.RETN();
         return;
-    }
-
-    /* Check jamming instructions. */
-    if (Asm::instructions[opcode].jam) {
-        std::cerr << "jamming instruction, stopping execution" << std::endl;
-        std::cerr << "  opcode " << std::hex << (int)opcode << std::endl;
-        std::cerr << "  pc     " << std::hex << (int)address << std::endl;
-        throw "Jamming instruction";
     }
 
     /* Interpret instruction. */
@@ -1489,10 +1481,11 @@ void Instruction::compile(X86::Emitter &emit)
         CASE_LD_IMM(AXS, AXS);
 
         default:
-            std::cerr << "unsupported instruction, stopping execution" << std::endl;
-            std::cerr << "  opcode " << std::hex << (int)opcode << std::endl;
-            std::cerr << "  pc     " << std::hex << (int)address << std::endl;
-            throw "Unsupported instruction";
+            /* Unsupported instruction, must be handled by the interpreter. */
+            emit.MOV(X86::eax, address);
+            emit.POPF();
+            emit.RETN();
+            break;
     }
 
     if (!exit && !branch)

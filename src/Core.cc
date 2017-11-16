@@ -48,16 +48,20 @@ void emulate()
             while (Events::isPaused() && !Events::isQuit()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
-            if (Events::isQuit())
+            if (Events::isQuit()) {
+                M6502::backtrace();
                 break;
+            }
         }
     } catch (const UnsupportedInstruction &exc) {
         std::cerr << "Fatal error (core): " << exc.what();
         std::cerr << ": " << (int)exc.opcode << std::endl;
+        M6502::backtrace();
         Events::quit();
     } catch (const JammingInstruction &exc) {
         std::cerr << "Fatal error (core): " << exc.what();
         std::cerr << ": " << (int)exc.opcode << std::endl;
+        M6502::backtrace();
         Events::quit();
     } catch (const char *msg) {
         std::cerr << "Fatal error (core): " << msg << std::endl;
