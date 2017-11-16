@@ -631,10 +631,12 @@ static inline void SEI(X86::Emitter &emit) {
 
 static inline void TAX(X86::Emitter &emit) {
     emit.MOV(Jit::X, Jit::A);
+    testZeroSign(emit, Jit::X, Jit::requiredFlags);
 }
 
 static inline void TAY(X86::Emitter &emit) {
     emit.MOV(Jit::Y, Jit::A);
+    testZeroSign(emit, Jit::Y, Jit::requiredFlags);
 }
 
 static inline void TSX(X86::Emitter &emit) {
@@ -648,15 +650,15 @@ static inline void TXA(X86::Emitter &emit) {
     testZeroSign(emit, Jit::A, Jit::requiredFlags);
 }
 
+static inline void TYA(X86::Emitter &emit) {
+    emit.MOV(Jit::A, Jit::Y);
+    testZeroSign(emit, Jit::A, Jit::requiredFlags);
+}
+
 static inline void TXS(X86::Emitter &emit) {
     emit.MOV(X86::ecx, X86::edi);
     emit.MOV(X86::cl, Jit::X);
     emit.MOV(X86::edi, X86::ecx);
-}
-
-static inline void TYA(X86::Emitter &emit) {
-    emit.MOV(Jit::A, Jit::Y);
-    testZeroSign(emit, Jit::A, Jit::requiredFlags);
 }
 
 /**
