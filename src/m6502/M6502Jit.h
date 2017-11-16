@@ -17,7 +17,6 @@ public:
     Instruction(u16 address, u8 opcode, u8 op0 = 0, u8 op1 = 0);
     ~Instruction();
 
-    void setNext(Instruction *instr);
     void compile(X86::Emitter &emit);
     void run(long quantum);
 

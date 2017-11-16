@@ -1609,14 +1609,6 @@ Instruction::~Instruction()
 {
 }
 
-void Instruction::setNext(Instruction *instr)
-{
-    if (instr == NULL)
-        return;
-    /// TODO add x86 instruction to jump to selected instruction
-    next = instr;
-}
-
 extern "C" {
 /**
  * Assembly entry point.
