@@ -766,61 +766,34 @@ static void storeZeroPage(
     emit.MOV(X86::eax(), r);
 }
 
-static void loadZeroPageX(
+static void loadZeroPageIndexed(
     X86::Emitter &emit,
     u16 pc,
     Operation cont,
     bool wb,
+    const X86::Reg<u8> &p,
     const X86::Reg<u8> &r = Jit::M)
 {
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
-    emit.ADD(X86::al, Jit::X);
+    emit.ADD(X86::al, p);
     emit.MOV(r, X86::eax());
     cont(emit, r);
     if (wb)
         emit.MOV(X86::eax(), r);
 }
 
-static void storeZeroPageX(
+static void storeZeroPageIndexed(
     X86::Emitter &emit,
     u16 pc,
+    const X86::Reg<u8> &p,
     const X86::Reg<u8> &r)
 {
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
     emit.MOV(X86::eax, (u32)(zp + off));
-    emit.ADD(X86::al, Jit::X);
-    emit.MOV(X86::eax(), r);
-}
-
-static void loadZeroPageY(
-    X86::Emitter &emit,
-    u16 pc,
-    Operation cont,
-    bool wb,
-    const X86::Reg<u8> &r = Jit::M)
-{
-    u8 *zp = Memory::ram;
-    u8 off = Memory::load(pc + 1);
-    emit.MOV(X86::eax, (u32)(zp + off));
-    emit.ADD(X86::al, Jit::Y);
-    emit.MOV(r, X86::eax());
-    cont(emit, r);
-    if (wb)
-        emit.MOV(X86::eax(), r);
-}
-
-static void storeZeroPageY(
-    X86::Emitter &emit,
-    u16 pc,
-    const X86::Reg<u8> &r)
-{
-    u8 *zp = Memory::ram;
-    u8 off = Memory::load(pc + 1);
-    emit.MOV(X86::eax, (u32)(zp + off));
-    emit.ADD(X86::al, Jit::Y);
+    emit.ADD(X86::al, p);
     emit.MOV(X86::eax(), r);
 }
 
@@ -869,18 +842,21 @@ static void storeAbsolute(
  * (without wrapping), and repeated if the addition causes the high u8 to
  * change.
  */
-static void loadAbsoluteX(
+static void loadAbsoluteIndexed(
     X86::Emitter &emit,
     u16 pc,
     Operation cont,
     bool wb,
+    const X86::Reg<u8> &p,
     const X86::Reg<u8> &r = Jit::M)
 {
     u16 addr = Memory::loadw(pc + 1);
     emit.MOV(X86::eax, (u32)addr);
-    emit.ADD(X86::al, Jit::X);
+    emit.ADD(X86::al, p);
     u32 *jmp = emit.JNC();
-    // Implement Oops cycle if the page changes.
+    // Implement Oops cycle if the page changes. If the instruction is a
+    // Read-Modify write, the dummy read is always compiled in.
+    //
     // Note: the dummy read is important only if the address is linked
     // to the PPU registers.
     if (!wb) {
@@ -911,9 +887,10 @@ static void loadAbsoluteX(
     }
 }
 
-static void storeAbsoluteX(
+static void storeAbsoluteIndexed(
     X86::Emitter &emit,
     u16 pc,
+    const X86::Reg<u8> &p,
     const X86::Reg<u8> &r)
 {
     u16 addr = Memory::loadw(pc + 1);
@@ -921,74 +898,7 @@ static void storeAbsoluteX(
         emit.MOV(Jit::M, r);
     emit.MOV(X86::eax, (u32)addr);
     emit.MOV(X86::ecx, 0);
-    emit.MOV(X86::cl, Jit::X);
-    emit.ADD(X86::eax, X86::ecx);
-    emit.PUSH(X86::edx);
-    emit.PUSH(X86::eax);
-    emit.CALL((u8 *)Memory::store);
-    emit.POP(X86::eax);
-    emit.POP(X86::edx);
-}
-
-/**
- * Implement the Oops cycle.
- * A first fecth is performed at the partially computed address addr + y
- * (without wrapping), and repeated if the addition causes the high u8 to
- * change.
- */
-static void loadAbsoluteY(
-    X86::Emitter &emit,
-    u16 pc,
-    Operation cont,
-    bool wb,
-    const X86::Reg<u8> &r = Jit::M)
-{
-    u16 addr = Memory::loadw(pc + 1);
-    emit.MOV(X86::eax, (u32)addr);
-    emit.ADD(X86::al, Jit::Y);
-    u32 *jmp = emit.JNC();
-    // Implement Oops cycle if the page changes.
-    // Note: the dummy read is important only if the address is linked
-    // to the PPU registers.
-    if (!wb) {
-        emit.INC(X86::esi);
-    }
-    emit.PUSH(X86::edx);
-    emit.PUSH(X86::eax);
-    emit.CALL((u8 *)Memory::load);
-    emit.POP(X86::eax);
-    emit.POP(X86::edx);
-    emit.INC(X86::ah);
-    // Back to regular load.
-    emit.setJump(jmp);
-    emit.PUSH(X86::edx);
-    emit.PUSH(X86::eax);
-    emit.CALL((u8 *)Memory::load);
-    emit.POP(X86::ecx);
-    emit.POP(X86::edx);
-    emit.MOV(Jit::M, X86::al);
-    emit.MOV(X86::eax, X86::ecx);
-    cont(emit, Jit::M);
-    if (wb) {
-        emit.PUSH(X86::edx);
-        emit.PUSH(X86::eax);
-        emit.CALL((u8 *)Memory::store);
-        emit.POP(X86::ecx);
-        emit.POP(X86::edx);
-    }
-}
-
-static void storeAbsoluteY(
-    X86::Emitter &emit,
-    u16 pc,
-    const X86::Reg<u8> &r)
-{
-    u16 addr = Memory::loadw(pc + 1);
-    if (r != Jit::M)
-        emit.MOV(Jit::M, r);
-    emit.MOV(X86::eax, (u32)addr);
-    emit.MOV(X86::ecx, 0);
-    emit.MOV(X86::cl, Jit::Y);
+    emit.MOV(X86::cl, p);
     emit.ADD(X86::eax, X86::ecx);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
@@ -1142,18 +1052,18 @@ static void storeIndirectIndexed(
 /**
  * Generate the code for an instruction fetching a value from memory.
  */
-#define CASE_LD_MEM(op, load, fun, ...)                                        \
+#define CASE_LD_MEM(op, mode, fun, ...)                                        \
     case op: {                                                                 \
-        load(emit, address, fun, false, ##__VA_ARGS__);                        \
+        load##mode(emit, address, fun, false, ##__VA_ARGS__);                  \
         break;                                                                 \
     }
 
 /**
  * Generate the code for an instruction with Read-Modify-Write behaviour.
  */
-#define CASE_UP_MEM(op, load, fun, ...)                                        \
+#define CASE_UP_MEM(op, mode, fun, ...)                                        \
     case op: {                                                                 \
-        load(emit, address, fun, true, ##__VA_ARGS__);                         \
+        load##mode(emit, address, fun, true, ##__VA_ARGS__);                   \
         break;                                                                 \
     }
 
@@ -1161,9 +1071,9 @@ static void storeIndirectIndexed(
  * Generate the code for an instruction writing a value to memory.
  * The source register is always specified.
  */
-#define CASE_ST_MEM(op, store, r, ...)                                         \
+#define CASE_ST_MEM(op, mode, r, ...)                                          \
     case op: {                                                                 \
-        store(emit, address, r, ##__VA_ARGS__);                                \
+        store##mode(emit, address, r, ##__VA_ARGS__);                          \
         break;                                                                 \
     }
 
@@ -1194,45 +1104,44 @@ static void storeIndirectIndexed(
         break;                                                                 \
     }
 
-#define CASE____NOP()           CASE____EXP(NOP_IMP, )
-#define CASE____NOP_UO(op)      CASE____EXP(op, )
-#define CASE____IMP(op, fun)    CASE____EXP(op##_IMP, fun(emit))
-#define CASE____IMP_UO(op, fun) CASE____EXP(op, fun(emit))
+#define CASE____NOP()               CASE____EXP(NOP_IMP, )
+#define CASE____NOP_UO(op)          CASE____EXP(op, )
+#define CASE____IMP(op, fun)        CASE____EXP(op##_IMP, fun(emit))
+#define CASE____IMP_UO(op, fun)     CASE____EXP(op, fun(emit))
 
-#define CASE_LD_IMM(op, ...)    CASE_LD_MEM(op##_IMM, loadImmediate, __VA_ARGS__)
-#define CASE_LD_ZPG(op, ...)    CASE_LD_MEM(op##_ZPG, loadZeroPage, __VA_ARGS__)
-#define CASE_LD_ZPX(op, ...)    CASE_LD_MEM(op##_ZPX, loadZeroPageX, __VA_ARGS__)
-#define CASE_LD_ZPY(op, ...)    CASE_LD_MEM(op##_ZPY, loadZeroPageY, __VA_ARGS__)
-#define CASE_LD_ABS(op, ...)    CASE_LD_MEM(op##_ABS, loadAbsolute, __VA_ARGS__)
-#define CASE_LD_ABX(op, ...)    CASE_LD_MEM(op##_ABX, loadAbsoluteX, __VA_ARGS__)
-#define CASE_LD_ABY(op, ...)    CASE_LD_MEM(op##_ABY, loadAbsoluteY, __VA_ARGS__)
-#define CASE_LD_IND(op, ...)    CASE_LD_MEM(op##_IND, loadIndirect, __VA_ARGS__)
-#define CASE_LD_INX(op, ...)    CASE_LD_MEM(op##_INX, loadIndexedIndirect, __VA_ARGS__)
-#define CASE_LD_INY(op, ...)    CASE_LD_MEM(op##_INY, loadIndirectIndexed, __VA_ARGS__)
+#define CASE_LD_IMM(op, ...)        CASE_LD_MEM(op##_IMM, Immediate, __VA_ARGS__)
+#define CASE_LD_ZPG(op, ...)        CASE_LD_MEM(op##_ZPG, ZeroPage, __VA_ARGS__)
+#define CASE_LD_ZPX(op, fun, ...)   CASE_LD_MEM(op##_ZPX, ZeroPageIndexed, fun, Jit::X, ##__VA_ARGS__)
+#define CASE_LD_ZPY(op, fun, ...)   CASE_LD_MEM(op##_ZPY, ZeroPageIndexed, fun, Jit::Y, ##__VA_ARGS__)
+#define CASE_LD_ABS(op, ...)        CASE_LD_MEM(op##_ABS, Absolute, __VA_ARGS__)
+#define CASE_LD_ABX(op, fun, ...)   CASE_LD_MEM(op##_ABX, AbsoluteIndexed, fun, Jit::X, ##__VA_ARGS__)
+#define CASE_LD_ABY(op, fun, ...)   CASE_LD_MEM(op##_ABY, AbsoluteIndexed, fun, Jit::Y, ##__VA_ARGS__)
+#define CASE_LD_INX(op, ...)        CASE_LD_MEM(op##_INX, IndexedIndirect, __VA_ARGS__)
+#define CASE_LD_INY(op, ...)        CASE_LD_MEM(op##_INY, IndirectIndexed, __VA_ARGS__)
 
-#define CASE_LD_IMM_UO(op, ...) CASE_LD_MEM(op, loadImmediate, __VA_ARGS__)
-#define CASE_LD_ZPG_UO(op, ...) CASE_LD_MEM(op, loadZeroPage, __VA_ARGS__)
-#define CASE_LD_ZPX_UO(op, ...) CASE_LD_MEM(op, loadZeroPageX, __VA_ARGS__)
-#define CASE_LD_ABS_UO(op, ...) CASE_LD_MEM(op, loadAbsolute, __VA_ARGS__)
-#define CASE_LD_ABX_UO(op, ...) CASE_LD_MEM(op, loadAbsoluteX, __VA_ARGS__)
+#define CASE_LD_IMM_UO(op, ...)     CASE_LD_MEM(op, Immediate, __VA_ARGS__)
+#define CASE_LD_ZPG_UO(op, ...)     CASE_LD_MEM(op, ZeroPage, __VA_ARGS__)
+#define CASE_LD_ZPX_UO(op, fun, ...) CASE_LD_MEM(op, ZeroPageIndexed, fun, Jit::X, ##__VA_ARGS__)
+#define CASE_LD_ABS_UO(op, ...)     CASE_LD_MEM(op, Absolute, __VA_ARGS__)
+#define CASE_LD_ABX_UO(op, fun, ...) CASE_LD_MEM(op, AbsoluteIndexed, fun, Jit::X, ##__VA_ARGS__)
 
-#define CASE_UP_ACC(op, fun)    CASE_UP_REG(op##_ACC, fun, Jit::A)
-#define CASE_UP_ZPG(op, fun)    CASE_UP_MEM(op##_ZPG, loadZeroPage, fun)
-#define CASE_UP_ZPX(op, fun)    CASE_UP_MEM(op##_ZPX, loadZeroPageX, fun)
-#define CASE_UP_ABS(op, fun)    CASE_UP_MEM(op##_ABS, loadAbsolute, fun)
-#define CASE_UP_ABX(op, fun)    CASE_UP_MEM(op##_ABX, loadAbsoluteX, fun)
-#define CASE_UP_ABY(op, fun)    CASE_UP_MEM(op##_ABY, loadAbsoluteY, fun)
-#define CASE_UP_INX(op, fun)    CASE_UP_MEM(op##_INX, loadIndexedIndirect, fun)
-#define CASE_UP_INY(op, fun)    CASE_UP_MEM(op##_INY, loadIndirectIndexed, fun)
+#define CASE_UP_ACC(op, fun)        CASE_UP_REG(op##_ACC, fun, Jit::A)
+#define CASE_UP_ZPG(op, fun)        CASE_UP_MEM(op##_ZPG, ZeroPage, fun)
+#define CASE_UP_ZPX(op, fun)        CASE_UP_MEM(op##_ZPX, ZeroPageIndexed, fun, Jit::X)
+#define CASE_UP_ABS(op, fun)        CASE_UP_MEM(op##_ABS, Absolute, fun)
+#define CASE_UP_ABX(op, fun)        CASE_UP_MEM(op##_ABX, AbsoluteIndexed, fun, Jit::X)
+#define CASE_UP_ABY(op, fun)        CASE_UP_MEM(op##_ABY, AbsoluteIndexed, fun, Jit::Y)
+#define CASE_UP_INX(op, fun)        CASE_UP_MEM(op##_INX, IndexedIndirect, fun)
+#define CASE_UP_INY(op, fun)        CASE_UP_MEM(op##_INY, IndirectIndexed, fun)
 
-#define CASE_ST_ZPG(op, reg)    CASE_ST_MEM(op##_ZPG, storeZeroPage, reg)
-#define CASE_ST_ZPX(op, reg)    CASE_ST_MEM(op##_ZPX, storeZeroPageX, reg)
-#define CASE_ST_ZPY(op, reg)    CASE_ST_MEM(op##_ZPY, storeZeroPageY, reg)
-#define CASE_ST_ABS(op, reg)    CASE_ST_MEM(op##_ABS, storeAbsolute, reg)
-#define CASE_ST_ABX(op, reg)    CASE_ST_MEM(op##_ABX, storeAbsoluteX, reg)
-#define CASE_ST_ABY(op, reg)    CASE_ST_MEM(op##_ABY, storeAbsoluteY, reg)
-#define CASE_ST_INX(op, reg)    CASE_ST_MEM(op##_INX, storeIndexedIndirect, reg)
-#define CASE_ST_INY(op, reg)    CASE_ST_MEM(op##_INY, storeIndirectIndexed, reg)
+#define CASE_ST_ZPG(op, reg)        CASE_ST_MEM(op##_ZPG, ZeroPage, reg)
+#define CASE_ST_ZPX(op, reg)        CASE_ST_MEM(op##_ZPX, ZeroPageIndexed, Jit::X, reg)
+#define CASE_ST_ZPY(op, reg)        CASE_ST_MEM(op##_ZPY, ZeroPageIndexed, Jit::Y, reg)
+#define CASE_ST_ABS(op, reg)        CASE_ST_MEM(op##_ABS, Absolute, reg)
+#define CASE_ST_ABX(op, reg)        CASE_ST_MEM(op##_ABX, AbsoluteIndexed, Jit::X, reg)
+#define CASE_ST_ABY(op, reg)        CASE_ST_MEM(op##_ABY, AbsoluteIndexed, Jit::Y, reg)
+#define CASE_ST_INX(op, reg)        CASE_ST_MEM(op##_INX, IndexedIndirect, reg)
+#define CASE_ST_INY(op, reg)        CASE_ST_MEM(op##_INY, IndirectIndexed, reg)
 
 /** Create a banch instruction with the given condition. */
 #define CASE_BR_REL(op, oppcond)                                               \
