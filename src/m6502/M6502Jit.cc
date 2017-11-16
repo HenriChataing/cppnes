@@ -1203,54 +1203,54 @@ static u16 getIndirect(void) {
  * as the pc points to the ROM (the precompiler applies only to RO code),
  * this load provokes no side effect and can be safely ignored.
  */
-#define CASE_NN_EXP(op, e)                                                     \
+#define CASE____EXP(op, e)                                                     \
     case op: {                                                                 \
         e;                                                                     \
         break;                                                                 \
     }
 
-#define CASE_NN_NOP() CASE_NN_EXP(NOP_IMP, )
-#define CASE_NN_NOP_UO(op) CASE_NN_EXP(op, )
-#define CASE_NN(op, fun) CASE_NN_EXP(op##_IMP, fun(emit))
-#define CASE_NN_UO(op, fun) CASE_NN_EXP(op, fun(emit))
+#define CASE____NOP()           CASE____EXP(NOP_IMP, )
+#define CASE____NOP_UO(op)      CASE____EXP(op, )
+#define CASE____IMP(op, fun)    CASE____EXP(op##_IMP, fun(emit))
+#define CASE____IMP_UO(op, fun) CASE____EXP(op, fun(emit))
 
-#define CASE_LD_IMM(op, ...)  CASE_LD_MEM(op##_IMM, loadImmediate, false, __VA_ARGS__)
-#define CASE_LD_ZPG(op, ...)  CASE_LD_MEM(op##_ZPG, loadZeroPage, false, __VA_ARGS__)
-#define CASE_LD_ZPX(op, ...)  CASE_LD_MEM(op##_ZPX, loadZeroPageX, false, __VA_ARGS__)
-#define CASE_LD_ZPY(op, ...)  CASE_LD_MEM(op##_ZPY, loadZeroPageY, false, __VA_ARGS__)
-#define CASE_LD_ABS(op, ...)  CASE_LD_MEM(op##_ABS, loadAbsolute, false, __VA_ARGS__)
-#define CASE_LD_ABX(op, ...)  CASE_LD_MEM(op##_ABX, loadAbsoluteX, false, __VA_ARGS__)
-#define CASE_LD_ABY(op, ...)  CASE_LD_MEM(op##_ABY, loadAbsoluteY, false, __VA_ARGS__)
-#define CASE_LD_IND(op, ...)  CASE_LD_MEM(op##_IND, loadIndirect, false, __VA_ARGS__)
-#define CASE_LD_INX(op, ...)  CASE_LD_MEM(op##_INX, loadIndexedIndirect, false, __VA_ARGS__)
-#define CASE_LD_INY(op, ...)  CASE_LD_MEM(op##_INY, loadIndirectIndexed, false, __VA_ARGS__)
+#define CASE_LD_IMM(op, ...)    CASE_LD_MEM(op##_IMM, loadImmediate, false, __VA_ARGS__)
+#define CASE_LD_ZPG(op, ...)    CASE_LD_MEM(op##_ZPG, loadZeroPage, false, __VA_ARGS__)
+#define CASE_LD_ZPX(op, ...)    CASE_LD_MEM(op##_ZPX, loadZeroPageX, false, __VA_ARGS__)
+#define CASE_LD_ZPY(op, ...)    CASE_LD_MEM(op##_ZPY, loadZeroPageY, false, __VA_ARGS__)
+#define CASE_LD_ABS(op, ...)    CASE_LD_MEM(op##_ABS, loadAbsolute, false, __VA_ARGS__)
+#define CASE_LD_ABX(op, ...)    CASE_LD_MEM(op##_ABX, loadAbsoluteX, false, __VA_ARGS__)
+#define CASE_LD_ABY(op, ...)    CASE_LD_MEM(op##_ABY, loadAbsoluteY, false, __VA_ARGS__)
+#define CASE_LD_IND(op, ...)    CASE_LD_MEM(op##_IND, loadIndirect, false, __VA_ARGS__)
+#define CASE_LD_INX(op, ...)    CASE_LD_MEM(op##_INX, loadIndexedIndirect, false, __VA_ARGS__)
+#define CASE_LD_INY(op, ...)    CASE_LD_MEM(op##_INY, loadIndirectIndexed, false, __VA_ARGS__)
 
-#define CASE_LD_IMM_UO(op, ...)  CASE_LD_MEM(op, loadImmediate, false, __VA_ARGS__)
-#define CASE_LD_ZPG_UO(op, ...)  CASE_LD_MEM(op, loadZeroPage, false, __VA_ARGS__)
-#define CASE_LD_ZPX_UO(op, ...)  CASE_LD_MEM(op, loadZeroPageX, false, __VA_ARGS__)
-#define CASE_LD_ABS_UO(op, ...)  CASE_LD_MEM(op, loadAbsolute, false, __VA_ARGS__)
-#define CASE_LD_ABX_UO(op, ...)  CASE_LD_MEM(op, loadAbsoluteX, false, __VA_ARGS__)
+#define CASE_LD_IMM_UO(op, ...) CASE_LD_MEM(op, loadImmediate, false, __VA_ARGS__)
+#define CASE_LD_ZPG_UO(op, ...) CASE_LD_MEM(op, loadZeroPage, false, __VA_ARGS__)
+#define CASE_LD_ZPX_UO(op, ...) CASE_LD_MEM(op, loadZeroPageX, false, __VA_ARGS__)
+#define CASE_LD_ABS_UO(op, ...) CASE_LD_MEM(op, loadAbsolute, false, __VA_ARGS__)
+#define CASE_LD_ABX_UO(op, ...) CASE_LD_MEM(op, loadAbsoluteX, false, __VA_ARGS__)
 
-#define CASE_ST_ZPG(op, reg)  CASE_ST_MEM(op##_ZPG, reg, storeZeroPage)
-#define CASE_ST_ZPX(op, reg)  CASE_ST_MEM(op##_ZPX, reg, storeZeroPageX)
-#define CASE_ST_ZPY(op, reg)  CASE_ST_MEM(op##_ZPY, reg, storeZeroPageY)
-#define CASE_ST_ABS(op, reg)  CASE_ST_MEM(op##_ABS, reg, storeAbsolute)
-#define CASE_ST_ABX(op, reg)  CASE_ST_MEM(op##_ABX, reg, storeAbsoluteX)
-#define CASE_ST_ABY(op, reg)  CASE_ST_MEM(op##_ABY, reg, storeAbsoluteY)
-#define CASE_ST_INX(op, reg)  CASE_ST_MEM(op##_INX, reg, storeIndexedIndirect)
-#define CASE_ST_INY(op, reg)  CASE_ST_MEM(op##_INY, reg, storeIndirectIndexed)
+#define CASE_ST_ZPG(op, reg)    CASE_ST_MEM(op##_ZPG, reg, storeZeroPage)
+#define CASE_ST_ZPX(op, reg)    CASE_ST_MEM(op##_ZPX, reg, storeZeroPageX)
+#define CASE_ST_ZPY(op, reg)    CASE_ST_MEM(op##_ZPY, reg, storeZeroPageY)
+#define CASE_ST_ABS(op, reg)    CASE_ST_MEM(op##_ABS, reg, storeAbsolute)
+#define CASE_ST_ABX(op, reg)    CASE_ST_MEM(op##_ABX, reg, storeAbsoluteX)
+#define CASE_ST_ABY(op, reg)    CASE_ST_MEM(op##_ABY, reg, storeAbsoluteY)
+#define CASE_ST_INX(op, reg)    CASE_ST_MEM(op##_INX, reg, storeIndexedIndirect)
+#define CASE_ST_INY(op, reg)    CASE_ST_MEM(op##_INY, reg, storeIndirectIndexed)
 
-#define CASE_UP_ACC(op, fun)  CASE_UP_REG(op##_ACC, fun, Jit::A)
-#define CASE_UP_ZPG(op, fun)  CASE_LD_MEM(op##_ZPG, loadZeroPage, true, fun)
-#define CASE_UP_ZPX(op, fun)  CASE_LD_MEM(op##_ZPX, loadZeroPageX, true, fun)
-#define CASE_UP_ABS(op, fun)  CASE_LD_MEM(op##_ABS, loadAbsolute, true, fun)
-#define CASE_UP_ABX(op, fun)  CASE_LD_MEM(op##_ABX, loadAbsoluteX, true, fun)
-#define CASE_UP_ABY(op, fun)  CASE_LD_MEM(op##_ABY, loadAbsoluteY, true, fun)
-#define CASE_UP_INX(op, fun)  CASE_LD_MEM(op##_INX, loadIndexedIndirect, true, fun)
-#define CASE_UP_INY(op, fun)  CASE_LD_MEM(op##_INY, loadIndirectIndexed, true, fun)
+#define CASE_UP_ACC(op, fun)    CASE_UP_REG(op##_ACC, fun, Jit::A)
+#define CASE_UP_ZPG(op, fun)    CASE_LD_MEM(op##_ZPG, loadZeroPage, true, fun)
+#define CASE_UP_ZPX(op, fun)    CASE_LD_MEM(op##_ZPX, loadZeroPageX, true, fun)
+#define CASE_UP_ABS(op, fun)    CASE_LD_MEM(op##_ABS, loadAbsolute, true, fun)
+#define CASE_UP_ABX(op, fun)    CASE_LD_MEM(op##_ABX, loadAbsoluteX, true, fun)
+#define CASE_UP_ABY(op, fun)    CASE_LD_MEM(op##_ABY, loadAbsoluteY, true, fun)
+#define CASE_UP_INX(op, fun)    CASE_LD_MEM(op##_INX, loadIndexedIndirect, true, fun)
+#define CASE_UP_INY(op, fun)    CASE_LD_MEM(op##_INY, loadIndirectIndexed, true, fun)
 
 /** Create a banch instruction with the given condition. */
-#define CASE_BR(op, oppcond)                                                   \
+#define CASE_BR_REL(op, oppcond)                                               \
     case op##_REL: {                                                           \
         checkCycles(emit, address);                                            \
         emit.POPF();                                                           \
@@ -1288,14 +1288,14 @@ void Instruction::compile(X86::Emitter &emit)
     /* Interpret instruction. */
     switch (opcode)
     {
-        CASE_BR(BCC, emit.JC);
-        CASE_BR(BCS, emit.JNC);
-        CASE_BR(BEQ, emit.JNZ);
-        CASE_BR(BMI, emit.JNS);
-        CASE_BR(BNE, emit.JZ);
-        CASE_BR(BPL, emit.JS);
-        CASE_BR(BVC, emit.JO);
-        CASE_BR(BVS, emit.JNO);
+        CASE_BR_REL(BCC, emit.JC);
+        CASE_BR_REL(BCS, emit.JNC);
+        CASE_BR_REL(BEQ, emit.JNZ);
+        CASE_BR_REL(BMI, emit.JNS);
+        CASE_BR_REL(BNE, emit.JZ);
+        CASE_BR_REL(BPL, emit.JS);
+        CASE_BR_REL(BVC, emit.JO);
+        CASE_BR_REL(BVS, emit.JNO);
 
         CASE_LD_IMM(ADC, ADC);
         CASE_LD_ZPG(ADC, ADC);
@@ -1324,10 +1324,10 @@ void Instruction::compile(X86::Emitter &emit)
         CASE_LD_ZPG(BIT, BIT);
         CASE_LD_ABS(BIT, BIT);
 
-        CASE_NN(CLC, CLC);
-        CASE_NN(CLD, CLD);
-        CASE_NN(CLI, CLI);
-        CASE_NN(CLV, CLV);
+        CASE____IMP(CLC, CLC);
+        CASE____IMP(CLD, CLD);
+        CASE____IMP(CLI, CLI);
+        CASE____IMP(CLV, CLV);
 
         CASE_LD_IMM(CMP, CMP);
         CASE_LD_ZPG(CMP, CMP);
@@ -1351,8 +1351,8 @@ void Instruction::compile(X86::Emitter &emit)
         CASE_UP_ABS(DEC, DEC);
         CASE_UP_ABX(DEC, DEC);
 
-        CASE_NN(DEX, DEX);
-        CASE_NN(DEY, DEY);
+        CASE____IMP(DEX, DEX);
+        CASE____IMP(DEY, DEY);
 
         CASE_LD_IMM(EOR, EOR);
         CASE_LD_ZPG(EOR, EOR);
@@ -1368,8 +1368,8 @@ void Instruction::compile(X86::Emitter &emit)
         CASE_UP_ABS(INC, INC);
         CASE_UP_ABX(INC, INC);
 
-        CASE_NN(INX, INX);
-        CASE_NN(INY, INY);
+        CASE____IMP(INX, INX);
+        CASE____IMP(INY, INY);
 
         CASE_LD_IMM(LDA, LDA, Jit::A);
         CASE_LD_ZPG(LDA, LDA, Jit::A);
@@ -1398,7 +1398,7 @@ void Instruction::compile(X86::Emitter &emit)
         CASE_UP_ABS(LSR, LSR);
         CASE_UP_ABX(LSR, LSR);
 
-        CASE_NN_NOP();
+        CASE____NOP();
 
         CASE_LD_IMM(ORA, ORA);
         CASE_LD_ZPG(ORA, ORA);
@@ -1409,10 +1409,10 @@ void Instruction::compile(X86::Emitter &emit)
         CASE_LD_INX(ORA, ORA);
         CASE_LD_INY(ORA, ORA);
 
-        CASE_NN(PHA, PHA);
-        CASE_NN(PHP, PHP);
-        CASE_NN(PLA, PLA);
-        CASE_NN(PLP, PLP);
+        CASE____IMP(PHA, PHA);
+        CASE____IMP(PHP, PHP);
+        CASE____IMP(PLA, PLA);
+        CASE____IMP(PLP, PLP);
 
         CASE_UP_ACC(ROL, ROL);
         CASE_UP_ZPG(ROL, ROL);
@@ -1436,9 +1436,9 @@ void Instruction::compile(X86::Emitter &emit)
         CASE_LD_INY(SBC, SBC);
         CASE_LD_IMM_UO(0xeb, SBC);
 
-        CASE_NN(SEC, SEC);
-        CASE_NN(SED, SED);
-        CASE_NN(SEI, SEI);
+        CASE____IMP(SEC, SEC);
+        CASE____IMP(SED, SED);
+        CASE____IMP(SEI, SEI);
 
         CASE_ST_ZPG(STA, Jit::A);
         CASE_ST_ZPX(STA, Jit::A);
@@ -1456,12 +1456,12 @@ void Instruction::compile(X86::Emitter &emit)
         CASE_ST_ZPX(STY, Jit::Y);
         CASE_ST_ABS(STY, Jit::Y);
 
-        CASE_NN(TAX, TAX);
-        CASE_NN(TAY, TAY);
-        CASE_NN(TSX, TSX);
-        CASE_NN(TXA, TXA);
-        CASE_NN(TXS, TXS);
-        CASE_NN(TYA, TYA);
+        CASE____IMP(TAX, TAX);
+        CASE____IMP(TAY, TAY);
+        CASE____IMP(TSX, TSX);
+        CASE____IMP(TXA, TXA);
+        CASE____IMP(TXS, TXS);
+        CASE____IMP(TYA, TYA);
 
         /** Unofficial NOP instructions with IMM addressing. */
         CASE_LD_IMM_UO(0x80, NOP);
@@ -1484,12 +1484,12 @@ void Instruction::compile(X86::Emitter &emit)
         CASE_LD_ZPX_UO(0xf4, NOP);
 
         /** Unofficial NOP instructions with IMP addressing. */
-        CASE_NN_NOP_UO(0x1a);
-        CASE_NN_NOP_UO(0x3a);
-        CASE_NN_NOP_UO(0x5a);
-        CASE_NN_NOP_UO(0x7a);
-        CASE_NN_NOP_UO(0xda);
-        CASE_NN_NOP_UO(0xfa);
+        CASE____NOP_UO(0x1a);
+        CASE____NOP_UO(0x3a);
+        CASE____NOP_UO(0x5a);
+        CASE____NOP_UO(0x7a);
+        CASE____NOP_UO(0xda);
+        CASE____NOP_UO(0xfa);
 
         /** Unofficial NOP instructions with ABS addressing. */
         CASE_LD_ABS_UO(0x0c, NOP);
