@@ -184,10 +184,10 @@ void State::clear()
 /**
  * Read from one of the PPU io registers.
  */
-u8 State::readRegister(u16 addr)
+u8 State::readRegister(u16 addr, long quantum)
 {
     /* Synchronize with CPU */
-    N2C02::sync();
+    N2C02::sync(quantum);
 
     u8 val = 0x0;
 
@@ -270,10 +270,10 @@ u8 State::readRegister(u16 addr)
 /**
  * Write to one of the PPU io registers.
  */
-void State::writeRegister(u16 addr, u8 val)
+void State::writeRegister(u16 addr, u8 val, long quantum)
 {
     /* Synchronize with CPU */
-    N2C02::sync();
+    N2C02::sync(quantum);
     /* Set the value on the internal data bus. */
     bus = val;
     /* Analyse the write effects. */
@@ -1177,15 +1177,15 @@ next:
     }
 }
 
-void sync()
+void sync(long quantum)
 {
-    unsigned long cpu = M6502::currentState->cycles;
-    unsigned long diff = cpu - currentState->sync;
-    while (diff > 0) {
+    unsigned long cpu = M6502::currentState->cycles + quantum;
+    unsigned long sync = currentState->sync;
+    while (sync < cpu) {
         N2C02::dot();
         N2C02::dot();
         N2C02::dot();
-        diff--;
+        sync++;
     }
     currentState->sync = cpu;
 }

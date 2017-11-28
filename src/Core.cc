@@ -44,7 +44,7 @@ void emulate()
             /* Evaluate next instruction */
             u8 opcode = Memory::load(M6502::currentState->regs.pc);
             M6502::Eval::runOpcode(opcode);
-            N2C02::sync();
+            N2C02::sync(0);
             while (Events::isPaused() && !Events::isQuit()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }

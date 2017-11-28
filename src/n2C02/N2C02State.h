@@ -156,8 +156,8 @@ public:
     u8 oamaddr;
     // u8 oam[256];
 
-    u8 readRegister(u16 addr);
-    void writeRegister(u16 addr, u8 val);
+    u8 readRegister(u16 addr, long quantum = 0);
+    void writeRegister(u16 addr, u8 val, long quantum = 0);
     void dmaTransfer(u8 val);
 };
 
@@ -172,7 +172,7 @@ void setScanlineCallback(std::function<void(int, int)> callback);
 int init();
 void quit();
 void dot();
-void sync();
+void sync(long quantum);
 
 };
 
