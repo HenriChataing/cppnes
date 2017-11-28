@@ -1518,11 +1518,9 @@ extern long asmEntry(
 };
 
 /**
- * Jump to the compiled instruction and continue the emulation in native code.
- * The registers are loaded into matching native registers, and the code jumps
- * to the compiled instruction.
- * The last instruction is supposed to place the value of PC onto the stack to
- * inform the caller of the state reached.
+ * @brief Execute a dynamically recompiled code, starting from the current
+ *      instruction.
+ * @param quantum   Number of cpu cycles to emulate
  */
 void Instruction::run(long quantum)
 {
@@ -1532,6 +1530,7 @@ void Instruction::run(long quantum)
     // trace(opcode);
     Registers *regs = &currentState->regs;
     u8 *stack = Memory::ram + 0x100;
+    currentState->cycles += quantum;
     long r = asmEntry(nativeCode, regs, stack, -quantum);
-    currentState->cycles += r + quantum;
+    currentState->cycles += r;
 }
