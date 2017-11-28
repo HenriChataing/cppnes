@@ -787,7 +787,7 @@ namespace M6502 {
  */
 void trace(u8 opcode)
 {
-    u8 arg0, arg1;
+    u8 arg0 = 0, arg1 = 0;
     u16 jumpto;
 
     if (Asm::instructions[opcode].bytes > 1)

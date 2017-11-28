@@ -42,14 +42,15 @@ u8 *prgRam;
 /**
  * Initiate a DMA tranfer with the 2C02 PPU memory.
  */
-static void writeOAMDMARegister(u8 val);
+static void writeOAMDMARegister(u8 val, long quantum);
 
 /**
  * @brief Load a byte from an address in the CPU memory address space.
  * @param addr          absolute memory address
  * @return              the value read from the address \p addr
  */
-u8 load(u16 addr)
+static inline __attribute__((always_inline))
+u8 _load(u16 addr, long quantum)
 {
     // std::cerr << std::hex << "LOAD " << (int)addr << std::endl;
 
@@ -60,7 +61,7 @@ u8 load(u16 addr)
         return ram[addr & 0x7ff];
     else
     if (addr < 0x4000)
-        return N2C02::currentState->readRegister(addr);
+        return N2C02::currentState->readRegister(addr, quantum);
     else
     if (addr == JOYPAD1_ADDR)
         return Joypad::currentJoypad->readRegister();
@@ -83,12 +84,23 @@ u8 load(u16 addr)
         return 0x0;
 }
 
+u8 load(u16 addr, long quantum)
+{
+    return _load(addr, quantum);
+}
+
+u8 load0(u16 addr)
+{
+    return _load(addr, 0);
+}
+
 /**
  * @brief Store a byte at an address in the CPU memory address space.
  * @param addr          absolute memory address
  * @param val           written value
  */
-void store(u16 addr, u8 val)
+static inline __attribute__((always_inline))
+void _store(u16 addr, u8 val, long quantum)
 {
     // std::cerr << std::hex << "STORE ";
     // std::cerr << (int)addr << " " << (int)val << std::endl;
@@ -100,13 +112,13 @@ void store(u16 addr, u8 val)
         currentMapper->storePrg(addr, val);
     else
     if (addr < 0x4000)
-        N2C02::currentState->writeRegister(addr, val);
+        N2C02::currentState->writeRegister(addr, val, quantum);
     else
     if (addr == JOYPAD1_ADDR)
         Joypad::currentJoypad->writeRegister(val);
     else
     if (addr == OAMDMA_ADDR)
-        writeOAMDMARegister(val);
+        writeOAMDMARegister(val, quantum);
     else
     if (addr < 0x4020)
         // writeAPURegister(addr, val);
@@ -119,9 +131,20 @@ void store(u16 addr, u8 val)
         prgRam[addr & 0x1fff] = val;
 }
 
-static inline void writeOAMDMARegister(u8 val)
+void store(u16 addr, u8 val, long quantum)
+{
+    _store(addr, val, quantum);
+}
+
+void store0(u16 addr, u8 val)
+{
+    _store(addr, val, 0);
+}
+
+static inline void writeOAMDMARegister(u8 val, long quantum)
 {
     u16 dmaoffset, dmapage = (u16)val << 8;
+    N2C02::sync(quantum);
     for (dmaoffset = 0; dmaoffset < 0x100; dmaoffset++) {
         val = load(dmapage + dmaoffset);
         N2C02::currentState->dmaTransfer(val);

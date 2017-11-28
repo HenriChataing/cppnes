@@ -806,18 +806,22 @@ static void loadAbsolute(
 {
     u16 addr = Memory::loadw(pc + 1);
     emit.PUSH(X86::edx);
+    emit.PUSH(X86::esi);
     emit.PUSH((u32)addr);
     emit.CALL((u8 *)Memory::load);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
+    emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
     cont(emit, Jit::M);
     if (wb) {
+        emit.PUSH(X86::esi);
         emit.PUSH(X86::edx);
         emit.PUSH((u32)addr);
         emit.CALL((u8 *)Memory::store);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
+        emit.POP(X86::eax);
     }
 }
 
@@ -829,11 +833,13 @@ static void storeAbsolute(
     u16 addr = Memory::loadw(pc + 1);
     if (r != Jit::M)
         emit.MOV(Jit::M, r);
+    emit.PUSH(X86::esi);
     emit.PUSH(X86::edx);
     emit.PUSH((u32)addr);
     emit.CALL((u8 *)Memory::store);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
+    emit.POP(X86::eax);
 }
 
 /**
@@ -864,7 +870,7 @@ static void loadAbsoluteIndexed(
     }
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
-    emit.CALL((u8 *)Memory::load);
+    emit.CALL((u8 *)Memory::load0);
     emit.POP(X86::eax);
     emit.POP(X86::edx);
     emit.INC(X86::ah);
@@ -872,7 +878,7 @@ static void loadAbsoluteIndexed(
     emit.setJump(jmp);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
-    emit.CALL((u8 *)Memory::load);
+    emit.CALL((u8 *)Memory::load0);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
@@ -881,7 +887,7 @@ static void loadAbsoluteIndexed(
     if (wb) {
         emit.PUSH(X86::edx);
         emit.PUSH(X86::eax);
-        emit.CALL((u8 *)Memory::store);
+        emit.CALL((u8 *)Memory::store0);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
     }
@@ -902,7 +908,7 @@ static void storeAbsoluteIndexed(
     emit.ADD(X86::eax, X86::ecx);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::eax);
-    emit.CALL((u8 *)Memory::store);
+    emit.CALL((u8 *)Memory::store0);
     emit.POP(X86::eax);
     emit.POP(X86::edx);
 }
@@ -924,7 +930,7 @@ static void loadIndexedIndirect(
     emit.MOV(X86::ch, X86::eax());
     emit.PUSH(X86::edx);
     emit.PUSH(X86::ecx);
-    emit.CALL((u8 *)Memory::load);
+    emit.CALL((u8 *)Memory::load0);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
@@ -933,7 +939,7 @@ static void loadIndexedIndirect(
     if (wb) {
         emit.PUSH(X86::edx);
         emit.PUSH(X86::eax);
-        emit.CALL((u8 *)Memory::store);
+        emit.CALL((u8 *)Memory::store0);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
     }
@@ -956,7 +962,7 @@ static void storeIndexedIndirect(
     emit.MOV(X86::ch, X86::eax());
     emit.PUSH(X86::edx);
     emit.PUSH(X86::ecx);
-    emit.CALL((u8 *)Memory::store);
+    emit.CALL((u8 *)Memory::store0);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
 }
@@ -991,7 +997,7 @@ static void loadIndirectIndexed(
     }
     emit.PUSH(X86::edx);
     emit.PUSH(X86::ecx);
-    emit.CALL((u8 *)Memory::load);
+    emit.CALL((u8 *)Memory::load0);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.INC(X86::ch);
@@ -999,7 +1005,7 @@ static void loadIndirectIndexed(
     emit.setJump(jmp);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::ecx);
-    emit.CALL((u8 *)Memory::load);
+    emit.CALL((u8 *)Memory::load0);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
@@ -1009,7 +1015,7 @@ static void loadIndirectIndexed(
     if (wb) {
         emit.PUSH(X86::edx);
         emit.PUSH(X86::eax);
-        emit.CALL((u8 *)Memory::store);
+        emit.CALL((u8 *)Memory::store0);
         emit.POP(X86::ecx);
         emit.POP(X86::edx);
     }
@@ -1038,7 +1044,7 @@ static void storeIndirectIndexed(
     /// TODO check carry bit, if 1 add cycle and repeat load
     emit.PUSH(X86::edx);
     emit.PUSH(X86::ecx);
-    emit.CALL((u8 *)Memory::store);
+    emit.CALL((u8 *)Memory::store0);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
 

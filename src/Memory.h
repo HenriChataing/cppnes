@@ -45,9 +45,11 @@ void configPrg(size_t bankSize);
 /**
  * @brief Load a byte from an address in the CPU memory address space.
  * @param addr          absolute memory address
+ * @param quantum       cycle count differential
  * @return              the value read from the address \p addr
  */
-u8 load(u16 addr);
+u8 load(u16 addr, long quantum = 0);
+u8 load0(u16 addr);
 
 /**
  * @brief Load a word for the addresses \p addr and \p addr+1.
@@ -76,8 +78,10 @@ inline u16 loadzw(u8 addr) {
  * @brief Store a byte at an address in the CPU memory address space.
  * @param addr          absolute memory address
  * @param val           written value
+ * @param quantum       cycle count differential
  */
-void store(u16 addr, u8 val);
+void store(u16 addr, u8 val, long quantum = 0);
+void store0(u16 addr, u8 val);
 
 enum {
     OAMDMA_ADDR = 0x4014,
