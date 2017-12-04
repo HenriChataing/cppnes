@@ -71,11 +71,11 @@ using namespace N2C02;
 #define PPUADDR     6
 #define PPUDATA     7
 
-#define PRERENDER   (currentState->scanline == 261)
-#define POSTRENDER  (currentState->scanline == 240)
-#define RENDEROFF   (!currentState->mask.br && !currentState->mask.sr)
-#define RENDERON    (currentState->mask.br || currentState->mask.sr)
-#define VBLANK      (currentState->scanline > 240)
+#define PRERENDER   (state.scanline == 261)
+#define POSTRENDER  (state.scanline == 240)
+#define RENDEROFF   (!state.mask.br && !state.mask.sr)
+#define RENDERON    (state.mask.br || state.mask.sr)
+#define VBLANK      (state.scanline > 240)
 
 /**
  * @brief Interleave the bits of two byte values.
@@ -157,7 +157,7 @@ extern const u32 colors[64];
 
 namespace N2C02 {
 
-State *currentState;
+State state;
 
 static u8 load(u16 addr);
 static void store(u16 addr, u8 val);
@@ -172,6 +172,10 @@ State::State()
         regs({ 0 }), ctrl({ 0 }), mask({ 0 }), status(0), oamaddr(0)
 {
     ctrl.i = 0x1;
+}
+
+State::~State()
+{
 }
 
 void State::clear()
@@ -361,7 +365,7 @@ void State::writeRegister(u16 addr, u8 val, long quantum)
 void State::dmaTransfer(u8 val)
 {
     /* Synchronize with CPU */
-    oam.raw[currentState->oamaddr++] = val;
+    oam.raw[state.oamaddr++] = val;
 }
 
 namespace N2C02 {
@@ -574,8 +578,8 @@ static inline void flushScreen(void)
  */
 static inline void shiftRegisters(void)
 {
-    currentState->regs.pats <<= 2;
-    currentState->regs.pals = (currentState->regs.pals << 2) | currentState->regs.pall;
+    state.regs.pats <<= 2;
+    state.regs.pals = (state.regs.pals << 2) | state.regs.pall;
 }
 
 /**
@@ -583,8 +587,8 @@ static inline void shiftRegisters(void)
  */
 static inline void shiftRegisters8(void)
 {
-    currentState->regs.pats <<= 16;
-    currentState->regs.pals = currentState->regs.pall * 0x5555;
+    state.regs.pats <<= 16;
+    state.regs.pals = state.regs.pall * 0x5555;
 }
 
 /**
@@ -593,10 +597,10 @@ static inline void shiftRegisters8(void)
 static inline void drawNextPixel(void)
 {
     /* Pixel data. */
-    unsigned int px = currentState->cycle - 1, py = currentState->scanline;
+    unsigned int px = state.cycle - 1, py = state.scanline;
 
     /* Early return when both background and sprite rendering are disabled. */
-    if (!currentState->mask.br && !currentState->mask.sr) {
+    if (!state.mask.br && !state.mask.sr) {
         drawPixel(px, py, 0x0);
         shiftRegisters();
         return;
@@ -606,7 +610,7 @@ static inline void drawNextPixel(void)
      * Early return when in first column and both background and sprite
      * clipping are activated.
      */
-    if (px < 8 && currentState->mask.bc && currentState->mask.sc) {
+    if (px < 8 && state.mask.bc && state.mask.sc) {
         drawPixel(px, py, 0x0);
         shiftRegisters();
         return;
@@ -618,11 +622,11 @@ static inline void drawNextPixel(void)
     u8 zero = 0, front = 0, pal = 0x10;
 
     /* Background rendering. */
-    if (currentState->mask.br && (!currentState->mask.bc || px >= 8)) {
-        bpx  = (currentState->regs.pats >> (30 - 2 * currentState->regs.x)) & 0x3;
+    if (state.mask.br && (!state.mask.bc || px >= 8)) {
+        bpx  = (state.regs.pats >> (30 - 2 * state.regs.x)) & 0x3;
     }
     /* Sprite rendering. */
-    if (currentState->mask.sr && (!currentState->mask.sc || px >= 8)) {
+    if (state.mask.sr && (!state.mask.sc || px >= 8)) {
         for (unsigned int n = 0; n < oamreg.cnt; n++) {
             struct sprite sprite = oamreg.sprites[n];
             unsigned int sx = sprite.val.x;
@@ -646,7 +650,7 @@ static inline void drawNextPixel(void)
 
     /* Sprite 0 hit. */
     if (spx != 0 && bpx != 0 && zero && px < 255) {
-        currentState->status |= PPUSTATUS_S;
+        state.status |= PPUSTATUS_S;
     }
 
     /* Craft the final palette address. */
@@ -656,7 +660,7 @@ static inline void drawNextPixel(void)
     } else
     if (bpx != 0) {
         pa = bpx;
-        pa |= (currentState->regs.pals >> (14 - 2 * currentState->regs.x) << 2) & 0xc;
+        pa |= (state.regs.pals >> (14 - 2 * state.regs.x) << 2) & 0xc;
     }
 
     u8 c = palette[pa];
@@ -669,7 +673,7 @@ static inline void drawNextPixel(void)
  */
 static inline void fetchPattern(void)
 {
-    currentState->regs.nt = ntables[(currentState->regs.v >> 10) & 0x3][currentState->regs.v & 0x3ff];
+    state.regs.nt = ntables[(state.regs.v >> 10) & 0x3][state.regs.v & 0x3ff];
 }
 
 /**
@@ -688,9 +692,9 @@ static inline void fetchAttribute(void)
      *    ++--------------- nametable select
      */
     u16 pa =
-        ((currentState->regs.v >> 2) & 0x0007) |
-        ((currentState->regs.v >> 4) & 0x0038) |
-        (currentState->regs.v & VADDR_NT_MASK) |
+        ((state.regs.v >> 2) & 0x0007) |
+        ((state.regs.v >> 4) & 0x0038) |
+        (state.regs.v & VADDR_NT_MASK) |
         0x23c0;
     u8 fullat = ntables[(pa >> 10) & 0x3][pa & 0x3ff];
     /*
@@ -698,8 +702,8 @@ static inline void fetchAttribute(void)
      * extracted at the shift composed of the bit 1 of the coarse
      * x,y coordinates.
      */
-    u8 shift = (currentState->regs.v & 0x2) | ((currentState->regs.v >> 4) & 0x4);
-    currentState->regs.at = fullat >> shift;
+    u8 shift = (state.regs.v & 0x2) | ((state.regs.v >> 4) & 0x4);
+    state.regs.at = fullat >> shift;
 }
 
 /**
@@ -708,11 +712,11 @@ static inline void fetchAttribute(void)
  */
 static inline void fetchBitmap(void)
 {
-    u16 pa = currentState->ctrl.b + ((currentState->regs.nt << 4) | (currentState->regs.v >> 12));
+    u16 pa = state.ctrl.b + ((state.regs.nt << 4) | (state.regs.v >> 12));
     u16 lo = Memory::chrRom[pa];
     u16 hi = Memory::chrRom[pa | 0x8];
-    currentState->regs.pats = (currentState->regs.pats & 0xffff0000) | interleave(lo, hi);
-    currentState->regs.pall = currentState->regs.at & 0x3;;
+    state.regs.pats = (state.regs.pats & 0xffff0000) | interleave(lo, hi);
+    state.regs.pall = state.regs.at & 0x3;;
 }
 
 /**
@@ -721,11 +725,11 @@ static inline void fetchBitmap(void)
  */
 static inline void incrCoarseX(void)
 {
-    if ((currentState->regs.v & VADDR_COARSE_X_MASK) == VADDR_COARSE_X_MAX) {
-        currentState->regs.v &= ~VADDR_COARSE_X_MASK;
-        currentState->regs.v ^= VADDR_NT_H_MASK;
+    if ((state.regs.v & VADDR_COARSE_X_MASK) == VADDR_COARSE_X_MAX) {
+        state.regs.v &= ~VADDR_COARSE_X_MASK;
+        state.regs.v ^= VADDR_NT_H_MASK;
     } else
-        currentState->regs.v++;
+        state.regs.v++;
 }
 
 /**
@@ -735,15 +739,15 @@ static inline void incrCoarseX(void)
 static inline void incrFineY(void)
 {
     /* No block change. */
-    if ((currentState->regs.v & VADDR_FINE_Y_MASK) != VADDR_FINE_Y_MASK)
-        currentState->regs.v += VADDR_FINE_Y_INCR;
+    if ((state.regs.v & VADDR_FINE_Y_MASK) != VADDR_FINE_Y_MASK)
+        state.regs.v += VADDR_FINE_Y_INCR;
     /* Increment coarse Y with no wrap around. */
-    else if ((currentState->regs.v & VADDR_COARSE_Y_MASK) != VADDR_COARSE_Y_MAX)
-        currentState->regs.v = (currentState->regs.v & ~VADDR_FINE_Y_MASK) + VADDR_COARSE_Y_INCR;
+    else if ((state.regs.v & VADDR_COARSE_Y_MASK) != VADDR_COARSE_Y_MAX)
+        state.regs.v = (state.regs.v & ~VADDR_FINE_Y_MASK) + VADDR_COARSE_Y_INCR;
     /* Increment coarse Y with wrap around. */
     else {
-        currentState->regs.v &= ~(VADDR_COARSE_Y_MASK | VADDR_FINE_Y_MASK);
-        currentState->regs.v ^= VADDR_NT_V_MASK;
+        state.regs.v &= ~(VADDR_COARSE_Y_MASK | VADDR_FINE_Y_MASK);
+        state.regs.v ^= VADDR_NT_V_MASK;
     }
 }
 
@@ -770,13 +774,13 @@ static void evaluateSprites(void)
     {
         /* Check if sprite in vertical range. */
         y = oam.sprites[n].val.y;
-        if (currentState->ctrl.h) {
-            if (currentState->scanline < (uint)y ||
-                currentState->scanline >= (uint)y + 16) {
+        if (state.ctrl.h) {
+            if (state.scanline < (uint)y ||
+                state.scanline >= (uint)y + 16) {
                 continue;
             }
-        } else if (currentState->scanline < (uint)y ||
-                   currentState->scanline >= (uint)y + 8) {
+        } else if (state.scanline < (uint)y ||
+                   state.scanline >= (uint)y + 8) {
             continue;
         }
         /* Copy sprite to secondary OAM. */
@@ -801,13 +805,13 @@ overflow:
     m = 0;
     while (n < 64) {
         y = oam.sprites[n].raw[m];
-        if (currentState->scanline < (uint)y ||
-            currentState->scanline >= (uint)y + 8) {
+        if (state.scanline < (uint)y ||
+            state.scanline >= (uint)y + 8) {
             n++;
             m = (m + 1) % 4; /* The bug is here. */
         } else {
             /* n += (m == 3) + 1; */
-            currentState->status |= PPUSTATUS_O;
+            state.status |= PPUSTATUS_O;
             break;
         }
     }
@@ -818,15 +822,15 @@ overflow:
  */
 static inline void fetchSpriteBitmap(void)
 {
-    int n = currentState->cycle / 8 - 33;
-    u16 offset = currentState->scanline - oamsec.sprites[n].val.y;
+    int n = state.cycle / 8 - 33;
+    u16 offset = state.scanline - oamsec.sprites[n].val.y;
     u16 pa;
 
     /*
      * For 8 x 16 sprites, the pattern table is selected by the bit 0 of the
      * sprite index.
      */
-    if (currentState->ctrl.h) {
+    if (state.ctrl.h) {
         pa = (oamsec.sprites[n].val.index & 0x1) * 0x1000;
         pa += (oamsec.sprites[n].val.index & ~0x1) * 16;
 
@@ -849,7 +853,7 @@ static inline void fetchSpriteBitmap(void)
      * PPU control register.
      */
     else {
-        pa = currentState->ctrl.s;
+        pa = state.ctrl.s;
         pa += oamsec.sprites[n].val.index * 16;
         /* Vertical flip. */
         if (oamsec.sprites[n].val.attr & SPRITE_ATTR_VF)
@@ -867,10 +871,10 @@ static inline void fetchSpriteBitmap(void)
 #if 0
 static void prerenderBackground(void)
 {
-    u16 v = currentState->regs.t;
+    u16 v = state.regs.t;
     int fx, fy, cx, cy, nt, ntp;
-    fx = currentState->regs.x;
-    fy = (currentState->regs.v >> 12) & 0x7;
+    fx = state.regs.x;
+    fy = (state.regs.v >> 12) & 0x7;
     cx = v & 0x1f;
     cy = (v >> 5) & 0x1f;
     nt = (v >> 10) & 0x3;
@@ -890,7 +894,7 @@ static void prerenderBackground(void)
             att >>= shift;
             att &= 0x3;
 
-            u16 pa = currentState->ctrl.b + (pat << 4);
+            u16 pa = state.ctrl.b + (pat << 4);
             for (int j = 0; j < 8; j++) {
                 u16 lo = Memory::chrRom[pa];
                 u16 hi = Memory::chrRom[pa | 0x8];
@@ -920,7 +924,7 @@ static void prerenderBackground(void)
  */
 static void prerenderSprites(void)
 {
-    int vsize = currentState->ctrl.h ? 16 : 8;
+    int vsize = state.ctrl.h ? 16 : 8;
     u16 pt, ptl;
     int px, py;
     u8 index, attr;
@@ -938,18 +942,18 @@ static void prerenderSprites(void)
 
         if (py >= 8 * PPU_VBLOCKS)
             continue;
-        if (currentState->ctrl.h) {
+        if (state.ctrl.h) {
             pt = (index & 0x1) * 0x1000;
             pt += (index & ~0x1) * 16;
         } else {
-            pt = currentState->ctrl.s + index * 16;
+            pt = state.ctrl.s + index * 16;
         }
 
         for (int line = 0; line < vsize; line++) {
             if (py + line >= 8 * PPU_VBLOCKS)
                 break;
             /* Patch pt for vertical flipping */
-            if (currentState->ctrl.h) {
+            if (state.ctrl.h) {
                 if (attr & SPRITE_ATTR_VF) {
                     /* Swap the high and low sprites and the sprite lines */
                     if (line >= 8)
@@ -1009,8 +1013,8 @@ void dot(void)
     static bool oddframe = 0;
 
     if (scanlineCallbackSet && RENDERON &&
-        currentState->scanline < 240 && currentState->cycle == 260)
-        scanlineCallback(currentState->scanline, currentState->cycle);
+        state.scanline < 240 && state.cycle == 260)
+        scanlineCallback(state.scanline, state.cycle);
 
     /*
      * Pre render line is mostly garbage, but the last fetches must be
@@ -1019,41 +1023,41 @@ void dot(void)
      */
     if (PRERENDER) {
         /* Clear status flags. */
-        if (currentState->cycle == 1)
-            currentState->status = 0;
+        if (state.cycle == 1)
+            state.status = 0;
         /* Rendering disabled. */
         if (RENDEROFF)
             goto next;
         /* Reload coarse X coordinates. */
-        else if (currentState->cycle == 257) {
-            if (currentState->cycle == 65)
+        else if (state.cycle == 257) {
+            if (state.cycle == 65)
                 evaluateSprites();
-            currentState->oamaddr = 0;
-            currentState->regs.v =
-                (currentState->regs.v & ~VADDR_X_MASK) |
-                (currentState->regs.t & VADDR_X_MASK);
+            state.oamaddr = 0;
+            state.regs.v =
+                (state.regs.v & ~VADDR_X_MASK) |
+                (state.regs.t & VADDR_X_MASK);
         }
         /* Reload Y fine and coarse offsets. */
-        else if (currentState->cycle >= 280 && currentState->cycle <= 304) {
-            currentState->oamaddr = 0;
-            currentState->regs.v =
-                (currentState->regs.v & ~VADDR_Y_MASK) |
-                (currentState->regs.t & VADDR_Y_MASK);
+        else if (state.cycle >= 280 && state.cycle <= 304) {
+            state.oamaddr = 0;
+            state.regs.v =
+                (state.regs.v & ~VADDR_Y_MASK) |
+                (state.regs.t & VADDR_Y_MASK);
         }
         /* Sprite loading interval. */
-        else if (currentState->cycle >= 258 && currentState->cycle <= 320) {
-            currentState->oamaddr = 0;
-            if (currentState->cycle % 8 == 0)
+        else if (state.cycle >= 258 && state.cycle <= 320) {
+            state.oamaddr = 0;
+            if (state.cycle % 8 == 0)
                 fetchSpriteBitmap();
         }
         /* Pre load two tiles for next line. */
-        else if (currentState->cycle >= 322 && currentState->cycle <= 340)
+        else if (state.cycle >= 322 && state.cycle <= 340)
         {
-            if (currentState->cycle % 8 == 2)
+            if (state.cycle % 8 == 2)
                 fetchPattern();
-            else if (currentState->cycle % 8 == 4)
+            else if (state.cycle % 8 == 4)
                 fetchAttribute();
-            else if (currentState->cycle % 8 == 0) {
+            else if (state.cycle % 8 == 0) {
                 shiftRegisters8();
                 fetchBitmap();
                 incrCoarseX();
@@ -1066,9 +1070,9 @@ void dot(void)
     /* PPU is idle while VBlank is occuring. */
     else if (VBLANK) {
         /* Set the vblank flag on tick 1 of the scanline 241. */
-        if (currentState->scanline == 241 && currentState->cycle == 1) {
-            currentState->status |= PPUSTATUS_V;
-            M6502::currentState->nmi = currentState->ctrl.v;
+        if (state.scanline == 241 && state.cycle == 1) {
+            state.status |= PPUSTATUS_V;
+            M6502::currentState->nmi = state.ctrl.v;
 #ifdef PPU_DEBUG
             drawPalettes(0, 0);
             if (ntables[0] == ntables[1]) {
@@ -1085,7 +1089,7 @@ void dot(void)
             SDL_UpdateWindowSurface(window);
 #endif
             // prerenderBackground();
-            if (currentState->mask.br)
+            if (state.mask.br)
                 flushScreen();
 #ifndef PPU_MAX_FPS
             /* Adjust the frame rate. */
@@ -1110,52 +1114,52 @@ void dot(void)
     /* Normal scanline. */
     else {
         /* First cycle is idle. */
-        if (currentState->cycle == 0)
+        if (state.cycle == 0)
             goto next;
         /* Next cycles form the visible scanline. */
-        else if (currentState->cycle <= 256) {
+        else if (state.cycle <= 256) {
             /* Draw a pixel with previously loaded data. */
             drawNextPixel();
             /*
              * Fetch new name table and attribute u8s at regular intervals ;
              * then the pattern data, and increment coarse X offset.
              */
-            if (currentState->cycle % 8 == 2)
+            if (state.cycle % 8 == 2)
                 fetchPattern();
-            else if (currentState->cycle % 8 == 4)
+            else if (state.cycle % 8 == 4)
                 fetchAttribute();
-            else if (currentState->cycle % 8 == 0) {
+            else if (state.cycle % 8 == 0) {
                 fetchBitmap();
                 incrCoarseX();
             }
             /* Fine Y increment. */
-            if (currentState->cycle == 256) {
+            if (state.cycle == 256) {
                 evaluateSprites();
                 incrFineY();
             }
         }
         /* Copy coarse X from t to v. */
-        else if (currentState->cycle == 257) {
-            currentState->oamaddr = 0;
-            currentState->regs.v =
-                (currentState->regs.v & ~VADDR_X_MASK) |
-                (currentState->regs.t & VADDR_X_MASK);
+        else if (state.cycle == 257) {
+            state.oamaddr = 0;
+            state.regs.v =
+                (state.regs.v & ~VADDR_X_MASK) |
+                (state.regs.t & VADDR_X_MASK);
         }
         /* Load sprite pattern data. */
-        else if (currentState->cycle < 321) {
-            currentState->oamaddr = 0;
-            if (currentState->cycle % 8 == 0)
+        else if (state.cycle < 321) {
+            state.oamaddr = 0;
+            if (state.cycle % 8 == 0)
                 fetchSpriteBitmap();
         }
         /* Pre load two tiles for next line. */
-        else if (currentState->cycle <= 340)
+        else if (state.cycle <= 340)
         {
             /* Exactly the same as visible scanline. */
-            if (currentState->cycle % 8 == 2)
+            if (state.cycle % 8 == 2)
                 fetchPattern();
-            else if (currentState->cycle % 8 == 4)
+            else if (state.cycle % 8 == 4)
                 fetchAttribute();
-            else if (currentState->cycle % 8 == 0) {
+            else if (state.cycle % 8 == 0) {
                 shiftRegisters8();
                 fetchBitmap();
                 incrCoarseX();
@@ -1165,29 +1169,29 @@ void dot(void)
 
 next:
     /* Increment dot tick and scanline ; and handle odd frames */
-    currentState->cycle++;
-    if (currentState->cycle == 341 && currentState->scanline == 261) {
+    state.cycle++;
+    if (state.cycle == 341 && state.scanline == 261) {
         /* No skipped tick when BG rendering is off. */
-        currentState->cycle = RENDERON ? oddframe : 0;
+        state.cycle = RENDERON ? oddframe : 0;
         oddframe = !oddframe;
-        currentState->scanline = 0;
-    } else if (currentState->cycle == 341) {
-        currentState->scanline++;
-        currentState->cycle = 0;
+        state.scanline = 0;
+    } else if (state.cycle == 341) {
+        state.scanline++;
+        state.cycle = 0;
     }
 }
 
 void sync(long quantum)
 {
     unsigned long cpu = M6502::currentState->cycles + quantum;
-    unsigned long sync = currentState->sync;
+    unsigned long sync = state.sync;
     while (sync < cpu) {
         N2C02::dot();
         N2C02::dot();
         N2C02::dot();
         sync++;
     }
-    currentState->sync = cpu;
+    state.sync = cpu;
 }
 
 /**
@@ -1231,7 +1235,7 @@ static void drawNameTable(int sx, int sy, int sel)
 {
     const uint32_t greyscale[4] = { 0xffffff, 0x404040, 0x808080, 0x0 };
     const u8 *ntable = ntables[sel % 4];
-    const u16 ptable = currentState->ctrl.b;
+    const u16 ptable = state.ctrl.b;
     int hpos = 0, vpos = 0;
 
     /* sx, sy refer to coordinates in the debug screen. */
@@ -1373,7 +1377,7 @@ static void drawPalettes(int sx, int sy)
  */
 static void drawSprites(void)
 {
-    int vsize = currentState->ctrl.h ? 16 : 8;
+    int vsize = state.ctrl.h ? 16 : 8;
     u16 pt, ptl;
     int px, py;
     u8 index, attr;
@@ -1392,18 +1396,18 @@ static void drawSprites(void)
 
         if (py >= 8 * PPU_VBLOCKS)
             continue;
-        if (currentState->ctrl.h) {
+        if (state.ctrl.h) {
             pt = (index & 0x1) * 0x1000;
             pt += (index & ~0x1) * 16;
         } else {
-            pt = currentState->ctrl.s + index * 16;
+            pt = state.ctrl.s + index * 16;
         }
 
         for (int line = 0; line < vsize; line++) {
             if (py + line >= 8 * PPU_VBLOCKS)
                 break;
             /* Patch pt for vertical flipping */
-            if (currentState->ctrl.h) {
+            if (state.ctrl.h) {
                 if (attr & SPRITE_ATTR_VF) {
                     /* Swap the high and low sprites and the sprite lines */
                     if (line >= 8)

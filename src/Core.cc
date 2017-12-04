@@ -26,7 +26,7 @@ void emulate()
 {
     M6502::currentState->clear();
     M6502::currentState->reset();
-    N2C02::currentState->clear();
+    N2C02::state.clear();
 
     try {
         while (true) {

@@ -161,7 +161,7 @@ public:
     void dmaTransfer(u8 val);
 };
 
-extern State *currentState;
+extern State state;
 
 void setVerticalMirroring(void);
 void setHorizontalMirroring(void);

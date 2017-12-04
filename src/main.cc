@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
     try {
         currentRom = new Rom(argv[1]);
         M6502::currentState = new M6502::State();
-        N2C02::currentState = new N2C02::State();
+        // N2C02::currentState = new N2C02::State();
         Joypad::currentJoypad = new Joypad::Joypad();
         N2C02::init();
         Events::init();

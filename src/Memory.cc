@@ -61,7 +61,7 @@ u8 _load(u16 addr, long quantum)
         return ram[addr & 0x7ff];
     else
     if (addr < 0x4000)
-        return N2C02::currentState->readRegister(addr, quantum);
+        return N2C02::state.readRegister(addr, quantum);
     else
     if (addr == JOYPAD1_ADDR)
         return Joypad::currentJoypad->readRegister();
@@ -112,7 +112,7 @@ void _store(u16 addr, u8 val, long quantum)
         currentMapper->storePrg(addr, val);
     else
     if (addr < 0x4000)
-        N2C02::currentState->writeRegister(addr, val, quantum);
+        N2C02::state.writeRegister(addr, val, quantum);
     else
     if (addr == JOYPAD1_ADDR)
         Joypad::currentJoypad->writeRegister(val);
@@ -147,7 +147,7 @@ static inline void writeOAMDMARegister(u8 val, long quantum)
     N2C02::sync(quantum);
     for (dmaoffset = 0; dmaoffset < 0x100; dmaoffset++) {
         val = load(dmapage + dmaoffset);
-        N2C02::currentState->dmaTransfer(val);
+        N2C02::state.dmaTransfer(val);
     }
     M6502::currentState->cycles += 514; /* Technically 513 OR 514. */
 }
