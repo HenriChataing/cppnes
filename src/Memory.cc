@@ -149,7 +149,7 @@ static inline void writeOAMDMARegister(u8 val, long quantum)
         val = load(dmapage + dmaoffset);
         N2C02::state.dmaTransfer(val);
     }
-    M6502::currentState->cycles += 514; /* Technically 513 OR 514. */
+    M6502::state->cycles += 514; /* Technically 513 OR 514. */
 }
 
 };

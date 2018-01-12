@@ -187,7 +187,7 @@ private:
             _irqCounter--;
 
         if (_irqCounter == 0) {
-            M6502::currentState->irq = _irqEnabled;
+            M6502::state->irq = _irqEnabled;
             _irqCounter = _irqLatch;
         }
     }

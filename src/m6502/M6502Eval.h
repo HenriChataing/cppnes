@@ -14,7 +14,9 @@ namespace Eval {
 void triggerNMI();
 void triggerIRQ();
 void runOpcode(u8 opcode);
+
 };
+
 };
 
 #endif /* _M6502EVAL_H_INCLUDED_ */

@@ -24,25 +24,25 @@ namespace Core
  */
 void emulate()
 {
-    M6502::currentState->clear();
-    M6502::currentState->reset();
+    M6502::state->clear();
+    M6502::state->reset();
     N2C02::state.clear();
 
     try {
         while (true) {
             /* Catch interrupts */
-            if (M6502::currentState->nmi) {
+            if (M6502::state->nmi) {
                 M6502::Eval::triggerNMI();
             } else
-            if (M6502::currentState->irq) {
+            if (M6502::state->irq) {
                 M6502::Eval::triggerIRQ();
             }
             /* Try jit */
-            M6502::Instruction *instr = M6502::cache.cache(M6502::currentState->regs.pc);
+            M6502::Instruction *instr = M6502::cache.cache(M6502::state->regs.pc);
             if (instr != NULL)
                 instr->run(1000);
             /* Evaluate next instruction */
-            u8 opcode = Memory::load(M6502::currentState->regs.pc);
+            u8 opcode = Memory::load(M6502::state->regs.pc);
             M6502::Eval::runOpcode(opcode);
             N2C02::sync(0);
             while (Events::isPaused() && !Events::isQuit()) {

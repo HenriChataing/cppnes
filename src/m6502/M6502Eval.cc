@@ -25,14 +25,14 @@ struct BacktraceEntry
 static std::vector<BacktraceEntry> _backtrace;
 #endif
 
-#define A           (currentState->regs.a)
-#define X           (currentState->regs.x)
-#define Y           (currentState->regs.y)
-#define P           (currentState->regs.p)
-#define SP          (currentState->regs.sp)
-#define PC          (currentState->regs.pc)
-#define PC_HI       (currentState->regs.pc >> 8)
-#define PC_LO       (currentState->regs.pc & 0xff)
+#define A           (state->regs.a)
+#define X           (state->regs.x)
+#define Y           (state->regs.y)
+#define P           (state->regs.p)
+#define SP          (state->regs.sp)
+#define PC          (state->regs.pc)
+#define PC_HI       (state->regs.pc >> 8)
+#define PC_LO       (state->regs.pc & 0xff)
 
 #define P_C         (1 << 0)
 #define P_Z         (1 << 1)
@@ -49,9 +49,9 @@ static std::vector<BacktraceEntry> _backtrace;
 #define P_CIDB      (P_C|P_I|P_D|P_B|P_R)
 #define P_CIDBV     (P_C|P_I|P_D|P_B|P_R|P_V)
 
-#define GET_C()     (currentState->regs.p & P_C)
-#define SET_N(v)    currentState->regs.p |= ((v) & P_N)
-#define SET_Z(v)    currentState->regs.p |= (((v) == 0) << 1)
+#define GET_C()     (state->regs.p & P_C)
+#define SET_N(v)    state->regs.p |= ((v) & P_N)
+#define SET_Z(v)    state->regs.p |= (((v) == 0) << 1)
 #define SET_NZ(v)                                                              \
     SET_N(v);                                                                  \
     SET_Z(v)
@@ -279,7 +279,7 @@ static inline void NOP(u16 m) {
 static inline void BRK(u8 m) {
 #ifdef CPU_BACKTRACE
     _backtrace.push_back(
-        BacktraceEntry(BRK_IMP, currentState->regs, currentState->cycles));
+        BacktraceEntry(BRK_IMP, state->regs, state->cycles));
 #endif
     (void)m;
     PUSH(PC_HI);
@@ -296,7 +296,7 @@ static inline void JMP(u16 pc) {
 static inline void JSR(u16 pc) {
 #ifdef CPU_BACKTRACE
     _backtrace.push_back(
-        BacktraceEntry(JSR_ABS, currentState->regs, currentState->cycles));
+        BacktraceEntry(JSR_ABS, state->regs, state->cycles));
 #endif
     PC--;
     PUSH(PC_HI);
@@ -559,7 +559,7 @@ static u8 getAbsoluteX(void) {
     u16 addrX = addr + X;
     if ((addr & 0xff00) != (addrX & 0xff00)) {
         (void)Memory::load((addr & 0xff00) | (addrX & 0x00ff));
-        currentState->cycles++;
+        state->cycles++;
     }
     return Memory::load(addrX);
 }
@@ -587,7 +587,7 @@ static u8 getAbsoluteY(void) {
     u16 addrY = addr + Y;
     if ((addr & 0xff00) != (addrY & 0xff00)) {
         (void)Memory::load((addr & 0xff00) | (addrY & 0x00ff));
-        currentState->cycles++;
+        state->cycles++;
     }
     return Memory::load(addrY);
 }
@@ -626,7 +626,7 @@ static u8 getIndirectIndexed(void) {
     addrY = addr + Y;
     if ((addr & 0xff00) != (addrY & 0xff00)) {
         (void)Memory::load((addr & 0xff00) | (addrY & 0x00ff));
-        currentState->cycles++;
+        state->cycles++;
     }
     return Memory::load(addrY);
 }
@@ -734,7 +734,7 @@ static u16 getIndirect(void) {
                 __pc = PC - __off;                                             \
             } else                                                             \
                 __pc = PC + __off;                                             \
-            currentState->cycles += PAGE_DIFF(__pc, PC) + 1;                   \
+            state->cycles += PAGE_DIFF(__pc, PC) + 1;                   \
             PC = __pc;                                                         \
         } else {                                                               \
             PC += Asm::instructions[op##_REL].bytes;                           \
@@ -769,7 +769,7 @@ static u16 getIndirect(void) {
 #define CASE_ST_INX(op, reg)  CASE_ST_MEM(op##_INX, reg, getIndexedIndirectAddr)
 #define CASE_ST_INY(op, reg)  CASE_ST_MEM(op##_INY, reg, getIndirectIndexedAddr)
 
-#define CASE_UP_ACC(op, fun)  CASE_UP_REG(op##_ACC, fun, currentState->regs.a)
+#define CASE_UP_ACC(op, fun)  CASE_UP_REG(op##_ACC, fun, state->regs.a)
 #define CASE_UP_ZPG(op, fun)  CASE_UP_MEM(op##_ZPG, fun, getZeroPageAddr)
 #define CASE_UP_ZPX(op, fun)  CASE_UP_MEM(op##_ZPX, fun, getZeroPageXAddr)
 #define CASE_UP_ABS(op, fun)  CASE_UP_MEM(op##_ABS, fun, getAbsoluteAddr)
@@ -889,7 +889,7 @@ void trace(u8 opcode)
     std::cerr << " Y:" << std::setw(2) << (int)Y;
     std::cerr << " P:" << std::setw(2) << (int)P;
     std::cerr << " SP:" << std::setw(2) << (int)SP;
-    std::cerr << " CYC:" << std::dec << currentState->cycles;
+    std::cerr << " CYC:" << std::dec << state->cycles;
     std::cerr << std::nouppercase << std::endl;
 }
 
@@ -1041,11 +1041,11 @@ void triggerNMI()
     _backtrace.push_back(
         BacktraceEntry(
             Memory::load(PC),
-            currentState->regs,
-            currentState->cycles));
+            state->regs,
+            state->cycles));
 #endif
-    currentState->cycles += Asm::instructions[BRK_IMP].cycles;
-    currentState->nmi = false;
+    state->cycles += Asm::instructions[BRK_IMP].cycles;
+    state->nmi = false;
 }
 
 /**
@@ -1060,16 +1060,16 @@ void triggerIRQ()
     _backtrace.push_back(
         BacktraceEntry(
             Memory::load(PC),
-            currentState->regs,
-            currentState->cycles));
+            state->regs,
+            state->cycles));
 #endif
     PUSH(PC_HI);
     PUSH(PC_LO);
     PUSH((P & ~0x30) | 0x20);
     P |= P_I;
     PC = Memory::loadw(Memory::IRQ_ADDR);
-    currentState->cycles += Asm::instructions[BRK_IMP].cycles;
-    currentState->irq = false;
+    state->cycles += Asm::instructions[BRK_IMP].cycles;
+    state->irq = false;
 }
 
 /**
@@ -1082,7 +1082,7 @@ void runOpcode(u8 opcode)
 
     /* Exclude jamming instructions. */
     if (Asm::instructions[opcode].jam) {
-        throw JammingInstruction(currentState->regs.pc, opcode);
+        throw JammingInstruction(state->regs.pc, opcode);
     }
 
     /* Interpret instruction. */
@@ -1390,10 +1390,10 @@ void runOpcode(u8 opcode)
         CASE_LD_IMM(AXS, AXS);
 
         default:
-            throw UnsupportedInstruction(currentState->regs.pc, opcode);
+            throw UnsupportedInstruction(state->regs.pc, opcode);
     }
 
-    currentState->cycles += Asm::instructions[opcode].cycles;
+    state->cycles += Asm::instructions[opcode].cycles;
 }
 
 };

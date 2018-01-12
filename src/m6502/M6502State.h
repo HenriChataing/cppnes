@@ -5,10 +5,7 @@
 
 #include "type.h"
 
-#define M6502_BACKTRACE_MAX 16
-
-namespace M6502
-{
+namespace M6502 {
 
 struct Registers
 {
@@ -20,27 +17,25 @@ struct Registers
     u16 pc;
 };
 
-static_assert(offsetof(Registers, a) == 0, "Unexpected Registers.a offset");
-static_assert(offsetof(Registers, x) == 1, "Unexpected Registers.x offset");
-static_assert(offsetof(Registers, y) == 2, "Unexpected Registers.y offset");
-static_assert(offsetof(Registers, p) == 3, "Unexpected Registers.p offset");
-static_assert(offsetof(Registers, sp) == 4, "Unexpected Registers.sp offset");
-static_assert(offsetof(Registers, pc) == 6, "Unexpected Registers.pc offset");
-
 class State
 {
 public:
     State();
     ~State();
 
+    /**
+     * @brief Set the cpu registers to the default boot values.
+     */
     void clear();
+
+    /**
+     * @brief Perform a machine reset. The program counter is set to the
+     *  reset address read from ROM memory at 0xfffc.
+     */
     void reset();
 
     /** CPU registers. */
     Registers regs;
-
-    /** Stack pointer (equal to Memory::ram + 0x100 + SP) */
-    u8 *stack;
 
     /** Cycle count. */
     ulong cycles;
@@ -52,10 +47,18 @@ public:
     bool irq;
 };
 
-extern State *currentState;
+/**
+ * @brief Global cpu state object.
+ */
+extern State *state;
 
-void backtrace();
+static_assert(offsetof(Registers, a) == 0, "Unexpected Registers.a offset");
+static_assert(offsetof(Registers, x) == 1, "Unexpected Registers.x offset");
+static_assert(offsetof(Registers, y) == 2, "Unexpected Registers.y offset");
+static_assert(offsetof(Registers, p) == 3, "Unexpected Registers.p offset");
+static_assert(offsetof(Registers, sp) == 4, "Unexpected Registers.sp offset");
+static_assert(offsetof(Registers, pc) == 6, "Unexpected Registers.pc offset");
 
-};
+}; /* namespace M6502 */
 
 #endif /* _CPU_H_INCLUDED_ */

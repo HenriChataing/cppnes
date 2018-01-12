@@ -514,13 +514,13 @@ static inline void CLC(X86::Emitter &emit) {
 }
 
 static inline void CLD(X86::Emitter &emit) {
-    u8 *p = &currentState->regs.p;
+    u8 *p = &state->regs.p;
     emit.MOV(X86::eax, (u32)p);
     emit.AND(X86::eax(), (u8)0xf7);
 }
 
 static inline void CLI(X86::Emitter &emit) {
-    u8 *p = &currentState->regs.p;
+    u8 *p = &state->regs.p;
     emit.MOV(X86::eax, (u32)p);
     emit.AND(X86::eax(), (u8)0xfb);
 }
@@ -567,7 +567,7 @@ static inline void PHA(X86::Emitter &emit) {
 }
 
 static inline void PHP(X86::Emitter &emit) {
-    u8 *p = &currentState->regs.p;
+    u8 *p = &state->regs.p;
     emit.MOV(X86::eax, (u32)p);
     emit.MOV(Jit::M, X86::eax());
     emit.AND(Jit::M, 0x3c); // Clear Carry, Zero, Overflow, Sign flags
@@ -590,11 +590,11 @@ static inline void PLA(X86::Emitter &emit) {
 }
 
 static inline void PLP(X86::Emitter &emit) {
-    u8 *p = &currentState->regs.p;
+    u8 *p = &state->regs.p;
     /* Unstack new flag values */
     PULL(emit, Jit::M);
     emit.AND(Jit::M, ~0x30); // Clear virtual flags
-    /* Update Interrupt, Decimal, etc. flags in currentState memory. */
+    /* Update Interrupt, Decimal, etc. flags in state memory. */
     emit.MOV(X86::eax, (u32)p);
     emit.MOV(X86::eax(), Jit::M);
     /* Update x86 status flags. */
@@ -618,13 +618,13 @@ static inline void SEC(X86::Emitter &emit) {
 }
 
 static inline void SED(X86::Emitter &emit) {
-    u8 *p = &currentState->regs.p;
+    u8 *p = &state->regs.p;
     emit.MOV(X86::eax, (u32)p);
     emit.OR(X86::eax(), (u8)0x8);
 }
 
 static inline void SEI(X86::Emitter &emit) {
-    u8 *p = &currentState->regs.p;
+    u8 *p = &state->regs.p;
     emit.MOV(X86::eax, (u32)p);
     emit.OR(X86::eax(), (u8)0x4);
 }
@@ -882,7 +882,15 @@ static void loadAbsoluteIndexed(
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
-    emit.MOV(X86::eax, X86::ecx);
+    // Double write back, old value is written once to the new address.
+    if (wb) {
+        emit.PUSH(X86::edx);
+        emit.PUSH(X86::ecx);
+        emit.CALL((u8 *)Memory::store0);
+        emit.POP(X86::ecx);
+        emit.POP(X86::edx);
+        emit.MOV(X86::eax, X86::ecx);
+    }
     cont(emit, Jit::M);
     if (wb) {
         emit.PUSH(X86::edx);
@@ -934,7 +942,15 @@ static void loadIndexedIndirect(
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
-    emit.MOV(X86::eax, X86::ecx);
+    // Double write back, old value is written once to the new address.
+    if (wb) {
+        emit.PUSH(X86::edx);
+        emit.PUSH(X86::ecx);
+        emit.CALL((u8 *)Memory::store0);
+        emit.POP(X86::ecx);
+        emit.POP(X86::edx);
+        emit.MOV(X86::eax, X86::ecx);
+    }
     cont(emit, Jit::M);
     if (wb) {
         emit.PUSH(X86::edx);
@@ -1009,8 +1025,15 @@ static void loadIndirectIndexed(
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
     emit.MOV(Jit::M, X86::al);
-    if (wb)
+    // Double write back, old value is written once to the new address.
+    if (wb) {
+        emit.PUSH(X86::edx);
+        emit.PUSH(X86::ecx);
+        emit.CALL((u8 *)Memory::store0);
+        emit.POP(X86::ecx);
+        emit.POP(X86::edx);
         emit.MOV(X86::eax, X86::ecx); // Save write back address to eax
+    }
     cont(emit, Jit::M);
     if (wb) {
         emit.PUSH(X86::edx);
@@ -1534,9 +1557,9 @@ void Instruction::run(long quantum)
         return;
 
     // trace(opcode);
-    Registers *regs = &currentState->regs;
+    Registers *regs = &state->regs;
     u8 *stack = Memory::ram + 0x100;
-    currentState->cycles += quantum;
+    state->cycles += quantum;
     long r = asmEntry(nativeCode, regs, stack, -quantum);
-    currentState->cycles += r;
+    state->cycles += r;
 }

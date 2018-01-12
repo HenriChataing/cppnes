@@ -1072,7 +1072,7 @@ void dot(void)
         /* Set the vblank flag on tick 1 of the scanline 241. */
         if (state.scanline == 241 && state.cycle == 1) {
             state.status |= PPUSTATUS_V;
-            M6502::currentState->nmi = state.ctrl.v;
+            M6502::state->nmi = state.ctrl.v;
 #ifdef PPU_DEBUG
             drawPalettes(0, 0);
             if (ntables[0] == ntables[1]) {
@@ -1183,7 +1183,7 @@ next:
 
 void sync(long quantum)
 {
-    unsigned long cpu = M6502::currentState->cycles + quantum;
+    unsigned long cpu = M6502::state->cycles + quantum;
     unsigned long sync = state.sync;
     while (sync < cpu) {
         N2C02::dot();
