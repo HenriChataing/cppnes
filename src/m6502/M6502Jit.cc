@@ -1046,7 +1046,7 @@ static void loadIndirectIndexed(
 
 /**
  * Implement the Oops cycle.
- * A first fecth is performed at the partially computed address addr + x
+ * A first fecth is performed at the partially computed address addr + y
  * (without wrapping).
  */
 static void storeIndirectIndexed(
@@ -1056,26 +1056,23 @@ static void storeIndirectIndexed(
 {
     u8 *zp = Memory::ram;
     u8 off = Memory::load(pc + 1);
-    if (r != Jit::M)
-        emit.MOV(Jit::M, r);
     emit.MOV(X86::eax, (u32)(zp + off));
     emit.MOV(X86::ecx, 0);
     emit.MOV(X86::cl, X86::eax());
     emit.INC(X86::al);
     emit.MOV(X86::ch, X86::eax());
     emit.ADD(X86::cl, Jit::Y);
-    /// TODO check carry bit, if 1 add cycle and repeat load
+    // TODO perform load at intermediate address (without wrapping)
+    u32 *jmp = emit.JNC();
+    emit.INC(X86::ch);
+    emit.setJump(jmp);
+    if (r != Jit::M)
+        emit.MOV(Jit::M, r);
     emit.PUSH(X86::edx);
     emit.PUSH(X86::ecx);
     emit.CALL((u8 *)Memory::store0);
     emit.POP(X86::ecx);
     emit.POP(X86::edx);
-
-    // u16 addr = Memory::load(PC + 1), addrY;
-    // addr = Memory::loadzw(addr);
-    // addrY = addr + Y;
-    // (void)Memory::load((addr & 0xff00) | (addrY & 0x00ff));
-    // return addrY;
 }
 
 /**
