@@ -1075,8 +1075,11 @@ void triggerIRQ()
 /**
  * @brief Execute a single instruction.
  */
-void runOpcode(u8 opcode)
+void step()
 {
+    /* Fetch next opcode. */
+    u8 opcode = Memory::load(M6502::state->regs.pc);
+
     /* Log present state and next instruction. */
     // trace(opcode);
 

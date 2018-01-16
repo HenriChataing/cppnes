@@ -13,7 +13,7 @@ namespace Eval {
 
 void triggerNMI();
 void triggerIRQ();
-void runOpcode(u8 opcode);
+void step();
 
 };
 

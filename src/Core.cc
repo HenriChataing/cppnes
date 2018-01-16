@@ -41,9 +41,8 @@ void emulate()
             M6502::Instruction *instr = M6502::cache.cache(M6502::state->regs.pc);
             if (instr != NULL)
                 instr->run(1000);
-            /* Evaluate next instruction */
-            u8 opcode = Memory::load(M6502::state->regs.pc);
-            M6502::Eval::runOpcode(opcode);
+            /* Fallback on interpreter */
+            M6502::Eval::step();
             N2C02::sync(0);
             while (Events::isPaused() && !Events::isQuit()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
